@@ -42,10 +42,13 @@ end
 to setup-patches
   ; In this method you may create the environment (patches), using colors to define dirty and cleaned cells.
   ask patches [
-    ifelse random 100 < dirt_pct
-      [ set pcolor grey ]
-      [ set pcolor white ]
+    set pcolor white
+    let pct random 100
+    show pct
+    if pct < dirt_pct + obstacles_pct [ set pcolor black ]
+    if pct < dirt_pct [ set pcolor grey ]
   ]
+  ask patch 0 0 [ set pcolor white ]
 end
 
 
@@ -90,36 +93,40 @@ to clean-dirt
 end
 
 to move
-  if finished? [ stop ]
-  let angle get-angle
-  show angle
-  ifelse angle = 0
+  ifelse rotate?
+    [ ifelse random 2 < 1
+      [ left 90 ]
+      [ right 90 ]
+    ]
     [ forward 1 ]
-    [ right angle ]
 end
 
-to-report finished?
-  if xcor = max-pxcor [
-    ifelse (max-pycor mod 2) = 0
-      [ report ycor = max-pycor ]
-      [ report ycor = min-pycor ]
-  ]
+to-report rotate?
+  if front-obstacle? [ report true ]
+  if random 100 < 20 [ report true ]
   report false
 end
 
-to-report get-angle
-  if ycor = min-pycor [
-    ifelse ((xcor mod 2) = 0)
-      [ if (heading != 0) [ report -90 ] ]
-      [ if (heading != 90) [ report -90 ] ]
-    ]
-  if ycor = max-pycor [
-    ifelse ((xcor mod 2) = 0)
-      [ if(heading != 90) [ report 90 ] ]
-      [ if (heading != 180) [ report 90 ] ]
-  ]
-  report 0
+to-report front-obstacle?
+  let x get-step
+  ifelse (heading mod 180) = 0 ;up or down
+    [ report obstacle? xcor (ycor + x) ]
+    [ report obstacle? (xcor + x) ycor ]
 end
+
+to-report get-step
+  ifelse heading / 90 < 2
+    [ report 1 ]
+    [ report -1 ]
+end
+
+to-report obstacle? [ x y ]
+  if x < min-pxcor or x > max-pxcor [ report true ]
+  if y < min-pycor or y > max-pycor [ report true ]
+  report ([pcolor] of patch x y) = black
+end
+
+; does it need to be exact percentage where possible - no (as per Lenin)
 @#$#@#$#@
 GRAPHICS-WINDOW
 281
@@ -184,9 +191,9 @@ NIL
 
 MONITOR
 7
-103
+154
 177
-148
+199
 dirt
 count patches with [pcolor = grey]
 17
@@ -202,7 +209,22 @@ dirt_pct
 dirt_pct
 0
 100
-50
+33
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+7
+100
+179
+133
+obstacles_pct
+obstacles_pct
+0
+100
+33
 1
 1
 NIL
