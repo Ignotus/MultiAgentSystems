@@ -33,6 +33,7 @@ end
 to go
   ; This method executes the main processing cycle of an agent.
   ; For Assignment 2, this only involves the execution of actions (and advancing the tick counter).
+  if finished? [ stop ]
   execute-actions
   tick
 end
@@ -44,7 +45,7 @@ to setup-patches
   ask patches [
     set pcolor white
     let pct random 100
-    show pct
+    ;show pct
     if pct < dirt_pct + obstacles_pct [ set pcolor black ]
     if pct < dirt_pct [ set pcolor grey ]
   ]
@@ -103,6 +104,7 @@ end
 
 to-report rotate?
   if front-obstacle? [ report true ]
+  ; perform rotation randomly to make the strategy more interesting
   if random 100 < 20 [ report true ]
   report false
 end
@@ -120,6 +122,14 @@ to-report get-step
     [ report -1 ]
 end
 
+to-report finished?
+  let x [xcor] of turtle 0
+  let y [ycor] of turtle 0
+  ifelse x = max-pxcor and y = max-pycor or count patches with [pcolor = grey] = 0
+  [report true]
+  [report false]
+end
+
 to-report obstacle? [ x y ]
   if x < min-pxcor or x > max-pxcor [ report true ]
   if y < min-pycor or y > max-pycor [ report true ]
@@ -131,11 +141,11 @@ end
 GRAPHICS-WINDOW
 281
 10
-526
-221
+606
+356
 -1
 -1
-60.0
+15.0
 1
 10
 1
@@ -146,9 +156,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-2
+20
 0
-2
+20
 1
 1
 1

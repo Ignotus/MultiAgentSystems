@@ -33,6 +33,7 @@ end
 to go
   ; This method executes the main processing cycle of an agent.
   ; For Assignment 2, this only involves the execution of actions (and advancing the tick counter).
+  if finished? [ stop ]
   execute-actions
   tick
 end
@@ -90,22 +91,32 @@ to clean-dirt
 end
 
 to move
-  if finished? [ stop ]
   let angle get-angle
-  show angle
+;  show angle
   ifelse angle = 0
     [ forward 1 ]
     [ right angle ]
 end
 
+
 to-report finished?
-  if xcor = max-pxcor [
-    ifelse (max-pycor mod 2) = 0
-      [ report ycor = max-pycor ]
-      [ report ycor = min-pycor ]
-  ]
-  report false
+  let x [xcor] of turtle 0
+  let y [ycor] of turtle 0
+  ifelse x = max-pxcor and y = max-pycor and count patches with [pcolor = grey] = 0
+  [report true]
+  [report false]
 end
+
+
+
+;;to-report finished?
+;;  if xcor = max-pxcor [
+;;    ifelse (max-pycor mod 2) = 0
+;;      [ report ycor = max-pycor ]
+;;      [ report ycor = min-pycor ]
+;;  ]
+;;  report false
+;;end
 
 to-report get-angle
   if ycor = min-pycor [
@@ -124,11 +135,11 @@ end
 GRAPHICS-WINDOW
 281
 10
-526
-221
+606
+356
 -1
 -1
-60.0
+15.0
 1
 10
 1
@@ -139,9 +150,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-2
+20
 0
-2
+20
 1
 1
 1
@@ -202,7 +213,7 @@ dirt_pct
 dirt_pct
 0
 100
-50
+64
 1
 1
 NIL

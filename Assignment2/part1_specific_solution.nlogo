@@ -70,7 +70,6 @@ to execute-actions
 end
 
 to-report finished?
-
   let x [xcor] of turtle 0
   let y [ycor] of turtle 0
 
