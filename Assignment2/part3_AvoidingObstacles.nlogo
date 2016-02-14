@@ -33,7 +33,6 @@ end
 to go
   ; This method executes the main processing cycle of an agent.
   ; For Assignment 2, this only involves the execution of actions (and advancing the tick counter).
-  if finished? [ stop ]
   execute-actions
   tick
 end
@@ -120,14 +119,6 @@ to-report get-step
   ifelse heading / 90 < 2
     [ report 1 ]
     [ report -1 ]
-end
-
-to-report finished?
-  let x [xcor] of turtle 0
-  let y [ycor] of turtle 0
-  ifelse x = max-pxcor and y = max-pycor or count patches with [pcolor = grey] = 0
-  [report true]
-  [report false]
 end
 
 to-report obstacle? [ x y ]

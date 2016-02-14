@@ -73,12 +73,8 @@ to-report finished?
   let x [xcor] of turtle 0
   let y [ycor] of turtle 0
 
-  ifelse x = max-pxcor and y = max-pycor and not dirty?
-  [report true]
-  [report false]
-  ;ifelse count patches with [pcolor = grey] = 0
-  ;[report true]
-  ;[report false]
+  if ([pcolor] of patch x y) = grey [ report false ]
+  report x = max-pxcor and y = max-pycor
 end
 
 

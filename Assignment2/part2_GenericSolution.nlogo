@@ -102,21 +102,16 @@ end
 to-report finished?
   let x [xcor] of turtle 0
   let y [ycor] of turtle 0
-  ifelse x = max-pxcor and y = max-pycor and count patches with [pcolor = grey] = 0
-  [report true]
-  [report false]
+  if ([pcolor] of patch x y) = grey [
+    report false
+  ]
+  if x = max-pxcor [
+    ifelse (max-pxcor mod 2) = 0
+    [ report y = max-pycor ]
+    [ report y = min-pycor ]
+  ]
+  report false
 end
-
-
-
-;;to-report finished?
-;;  if xcor = max-pxcor [
-;;    ifelse (max-pycor mod 2) = 0
-;;      [ report ycor = max-pycor ]
-;;      [ report ycor = min-pycor ]
-;;  ]
-;;  report false
-;;end
 
 to-report get-angle
   if ycor = min-pycor [
@@ -136,7 +131,7 @@ GRAPHICS-WINDOW
 281
 10
 606
-356
+506
 -1
 -1
 15.0
@@ -152,7 +147,7 @@ GRAPHICS-WINDOW
 0
 20
 0
-20
+30
 1
 1
 1
@@ -213,7 +208,7 @@ dirt_pct
 dirt_pct
 0
 100
-64
+50
 1
 1
 NIL
