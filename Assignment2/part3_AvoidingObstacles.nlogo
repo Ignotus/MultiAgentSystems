@@ -48,7 +48,11 @@ to setup-patches
     if pct < dirt_pct + obstacles_pct [ set pcolor black ]
     if pct < dirt_pct [ set pcolor grey ]
   ]
-  ask patch 0 0 [ set pcolor white ]
+  ask patch 0 0 [
+    ifelse random 100 < dirt_pct
+    [ set pcolor grey ]
+    [ set pcolor white ]
+  ]
 end
 
 
