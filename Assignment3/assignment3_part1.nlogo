@@ -70,38 +70,41 @@ to setup-patches
   let width (max-pxcor - min-pxcor)
   let height (max-pycor - min-pycor)
   let ncells (width * height)
-  let ndirt round(ncells / 100 * dirt_pct)
-  ; print "ndirt" ndirt
+  let ndirt round(ncells * dirt_pct / 100)
   while [ ndirt > 0 ] [
-    print "ndirt"
-    print ndirt
-    loop [
-      print "LOOP"
+    let x 0
+    let y 0
+    while [ [pcolor] of patch x y = white ] [
       let idx random ncells
-      let x (min-pxcor + idx mod height)
-      let y (min-pycor + round(idx / height))
+      set x (min-pxcor + idx mod height)
+      set y (min-pycor + round(idx / height))
       ask patch x y [
         if pcolor = white [
           set pcolor grey
-          stop
         ]
       ]
     ]
     set ndirt (ndirt - 1)
   ]
-  ;ask patches [ ifelse random 100 < dirt_pct [set pcolor grey] [set pcolor white]]
 end
 
 
 ; --- Setup vacuums ---
 to setup-vacuums
   ; In this method you may create the vacuum cleaner agents (in this case, there is only 1 vacuum cleaner agent).
+  create-turtles 1
+  ask turtles [
+    setxy 0 0
+    set heading 0 ; 0 is North, 90 is East, ...
+    set color green
+  ]
 end
 
 
 ; --- Setup ticks ---
 to setup-ticks
   ; In this method you may start the tick counter.
+  reset-ticks
 end
 
 
