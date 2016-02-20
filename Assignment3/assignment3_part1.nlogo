@@ -41,6 +41,7 @@ vacuums-own [beliefs desire intention]
 
 ; --- Setup ---
 to setup
+  clear-all
   set time 0
   setup-patches
   setup-vacuums
@@ -58,6 +59,12 @@ to go
   execute-actions
   tick
   set time ticks
+  if finished? [ stop ]
+end
+
+
+to-report finished?
+  report count vacuums with [intention = "stop"] = 1
 end
 
 
@@ -68,27 +75,24 @@ to setup-patches
     set pcolor white
   ]
   let i dirt_pct
-  let width (max-pxcor - min-pxcor)
-  let height (max-pycor - min-pycor)
+  let width (max-pxcor - min-pxcor + 1)
+  let height (max-pycor - min-pycor + 1)
   let ncells (width * height)
   let ndirt round(ncells * dirt_pct / 100)
 
   set total_dirty ndirt
   while [ ndirt > 0 ] [
-    let coordinate random-coordinate ncells height
-    while [ [pcolor] of patch (item 0 coordinate) (item 1 coordinate) = grey ] [
-      set coordinate random-coordinate ncells height
+    let x random-xcor
+    let y random-ycor
+    while [ [pcolor] of patch x y = grey ] [
+      set x random-xcor
+      set y random-ycor
     ]
-    ask patch (item 0 coordinate) (item 1 coordinate) [
+    ask patch x y [
       set pcolor grey
     ]
     set ndirt (ndirt - 1)
   ]
-end
-
-to-report random-coordinate [ncells height]
-  let idx random ncells
-  report list (min-pxcor + idx mod height) (min-pycor + round(idx / height))
 end
 
 
@@ -102,11 +106,11 @@ to setup-vacuums
     set beliefs []
   ]
 
-  ask patches [
-    if pcolor = grey [
-      ask vacuums [
-        set beliefs lput (list pxcor pycor) beliefs
-      ]
+  ask patches with [pcolor = grey] [
+    let patch_x pxcor
+    let patch_y pycor
+    ask vacuums [
+      set beliefs lput (list patch_x patch_y) beliefs
     ]
   ]
 end
@@ -124,10 +128,8 @@ to update-desires
   ; You should update your agent's desires here.
   ; At the beginning your agent should have the desire to clean all the dirt.
   ; If it realises that there is no more dirt, its desire should change to something like 'stop and turn off'.
-  ask vacuum 0 [
-    ifelse total_dirty = 0
-    [ set desire "stop" ]
-    [ set desire "clean" ]
+  ask vacuums [
+    ifelse total_dirty = 0 [ set desire "stop" ] [ set desire "clean" ]
   ]
 end
 
@@ -138,7 +140,9 @@ to update-beliefs
  ; At the beginning your agent will receive global information about where all the dirty locations are.
  ; This belief set needs to be updated frequently according to the cleaning actions: if you clean dirt, you do not believe anymore there is a dirt at that location.
  ; In Assignment 3.3, your agent also needs to know where is the garbage can.
-
+ ask vacuums with [ intention = "clear" ] [
+   set beliefs remove-item 0 beliefs
+ ]
 end
 
 
@@ -146,21 +150,50 @@ end
 to update-intentions
   ; You should update your agent's intentions here.
   ; The agent's intentions should be dependent on its beliefs and desires.
+  ask vacuums [
+    ifelse desire = "clean" [
+      let dest item 0 beliefs
+      ifelse dest = list xcor ycor [
+          set intention "clear"
+      ] [
+        let x item 0 dest
+        let y item 1 dest
+        ifelse (towardsxy x y) = heading [ set intention "move" ] [ set intention "rotate" ]
+      ]
+    ] [
+      set intention "stop"
+    ]
+  ]
 end
 
 
 ; --- Execute actions ---
 to execute-actions
   ; Here you should put the code related to the actions performed by your agent: moving and cleaning (and in Assignment 3.3, throwing away dirt).
+  ask vacuums [
+    if intention = "stop" [ stop ]
+    if intention = "clear" [
+      ask patch xcor ycor [
+        set pcolor white
+        set total_dirty total_dirty - 1
+      ]
+    ]
+
+    let cleaning_task item 0 beliefs
+    let x item 0 cleaning_task
+    let y item 1 cleaning_task
+    if intention = "rotate" [ facexy x y]
+    if intention = "move" [ ifelse distancexy x y > 1 [ fd 1 ] [setxy x y] ]
+  ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 782
 17
-1382
-638
-12
-12
+1051
+307
+5
+5
 23.6
 1
 10
@@ -171,10 +204,10 @@ GRAPHICS-WINDOW
 0
 0
 1
--12
-12
--12
-12
+-5
+5
+-5
+5
 1
 1
 1
@@ -190,7 +223,7 @@ dirt_pct
 dirt_pct
 0
 100
-31
+2
 1
 1
 NIL
