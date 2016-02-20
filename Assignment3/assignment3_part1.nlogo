@@ -57,6 +57,7 @@ to go
   update-intentions
   execute-actions
   tick
+  set time ticks
 end
 
 
@@ -71,32 +72,42 @@ to setup-patches
   let height (max-pycor - min-pycor)
   let ncells (width * height)
   let ndirt round(ncells * dirt_pct / 100)
+
+  set total_dirty ndirt
   while [ ndirt > 0 ] [
-    let x 0
-    let y 0
-    while [ [pcolor] of patch x y = white ] [
-      let idx random ncells
-      set x (min-pxcor + idx mod height)
-      set y (min-pycor + round(idx / height))
-      ask patch x y [
-        if pcolor = white [
-          set pcolor grey
-        ]
-      ]
+    let coordinate random-coordinate ncells height
+    while [ [pcolor] of patch (item 0 coordinate) (item 1 coordinate) = grey ] [
+      set coordinate random-coordinate ncells height
+    ]
+    ask patch (item 0 coordinate) (item 1 coordinate) [
+      set pcolor grey
     ]
     set ndirt (ndirt - 1)
   ]
+end
+
+to-report random-coordinate [ncells height]
+  let idx random ncells
+  report list (min-pxcor + idx mod height) (min-pycor + round(idx / height))
 end
 
 
 ; --- Setup vacuums ---
 to setup-vacuums
   ; In this method you may create the vacuum cleaner agents (in this case, there is only 1 vacuum cleaner agent).
-  create-turtles 1
-  ask turtles [
+  create-vacuums 1 [
     setxy 0 0
     set heading 0 ; 0 is North, 90 is East, ...
     set color green
+    set beliefs []
+  ]
+
+  ask patches [
+    if pcolor = grey [
+      ask vacuums [
+        set beliefs lput (list pxcor pycor) beliefs
+      ]
+    ]
   ]
 end
 
@@ -113,6 +124,11 @@ to update-desires
   ; You should update your agent's desires here.
   ; At the beginning your agent should have the desire to clean all the dirt.
   ; If it realises that there is no more dirt, its desire should change to something like 'stop and turn off'.
+  ask vacuum 0 [
+    ifelse total_dirty = 0
+    [ set desire "stop" ]
+    [ set desire "clean" ]
+  ]
 end
 
 
@@ -122,6 +138,7 @@ to update-beliefs
  ; At the beginning your agent will receive global information about where all the dirty locations are.
  ; This belief set needs to be updated frequently according to the cleaning actions: if you clean dirt, you do not believe anymore there is a dirt at that location.
  ; In Assignment 3.3, your agent also needs to know where is the garbage can.
+
 end
 
 
@@ -173,7 +190,7 @@ dirt_pct
 dirt_pct
 0
 100
-12
+31
 1
 1
 NIL
