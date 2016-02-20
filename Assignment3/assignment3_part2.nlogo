@@ -140,9 +140,19 @@ to update-beliefs
  ; At the beginning your agent will receive global information about where all the dirty locations are.
  ; This belief set needs to be updated frequently according to the cleaning actions: if you clean dirt, you do not believe anymore there is a dirt at that location.
  ; In Assignment 3.3, your agent also needs to know where is the garbage can.
- ask vacuums with [ intention = "clear" ] [
-   set beliefs remove-item 0 beliefs
+ ask vacuums [
+   ifelse intention = "clear" [
+     set beliefs remove-item 0 beliefs
+   ] [
+     set beliefs sort-by [dist ?1 < dist ?2] beliefs
+   ]
  ]
+end
+
+to-report dist [ coordinate ]
+  let x item 0 coordinate
+  let y item 1 coordinate
+  report (xcor - x) * (xcor - x) + (ycor - y) * (ycor - y)
 end
 
 
@@ -223,7 +233,7 @@ dirt_pct
 dirt_pct
 0
 100
-2
+30
 1
 1
 NIL
