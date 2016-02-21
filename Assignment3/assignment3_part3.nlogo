@@ -192,11 +192,9 @@ to update-intentions
     ifelse desire = "clean" [
       let dest item 0 beliefs
       ifelse dest = list xcor ycor [
-          set intention "clear"
+        set intention "clear"
       ] [
-        let x item 0 dest
-        let y item 1 dest
-        ifelse (towardsxy x y) = heading [ set intention "move" ] [ set intention "rotate" ]
+        set intention "go to dirt"
       ]
     ] [
       ifelse desire = "dump" [
@@ -205,7 +203,7 @@ to update-intentions
         ifelse xcor = x and ycor = y [
           set intention "dump"
         ] [
-          ifelse (towardsxy x y) = heading [ set intention "move" ] [ set intention "rotate" ]
+          set intention "go to garbage can"
         ]
       ] [
         set intention "stop"
@@ -230,17 +228,22 @@ to execute-actions
     if intention = "dump" [
       set dirt_count 0
     ]
-    ifelse desire = "clean" [
+    if intention = "go to dirt" [
       let cleaning_task item 0 beliefs
       let x item 0 cleaning_task
       let y item 1 cleaning_task
-      if intention = "rotate" [ facexy x y]
-      if intention = "move" [ ifelse distancexy x y > 1 [ fd 1 ] [setxy x y] ]
-    ] [
+      let action "move"
+      if (towardsxy x y) != heading [ set action "rotate" ]
+      if action = "rotate" [ facexy x y]
+      if action = "move" [ ifelse distancexy x y > 1 [ fd 1 ] [setxy x y] ]
+    ]
+    if intention = "go to garbage can" [
       let x [xcor] of one-of garbage-cans
       let y [ycor] of one-of garbage-cans
-      if intention = "rotate" [ facexy x y]
-      if intention = "move" [ ifelse distancexy x y > 1 [ fd 1 ] [setxy x y] ]
+      let action "move"
+      if (towardsxy x y) != heading [ set action "rotate" ]
+      if action = "rotate" [ facexy x y]
+      if action = "move" [ ifelse distancexy x y > 1 [ fd 1 ] [setxy x y] ]
     ]
   ]
 end
