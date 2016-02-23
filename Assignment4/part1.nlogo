@@ -24,7 +24,8 @@
 ;
 ; 1) total_dirty: this variable represents the amount of dirty cells in the environment.
 ; 2) time: the total simulation time.
-globals [total_dirty time]
+; 3) num_ses: number of sensors around cleaners
+globals [total_dirty time num_sens]
 
 
 ; --- Agents ---
@@ -32,6 +33,7 @@ globals [total_dirty time]
 ;
 ; 1) vacuums: vacuum cleaner agents.
 breed [vacuums vacuum]
+breed [sensors sensor]
 
 
 ; --- Local variables ---
@@ -46,8 +48,12 @@ vacuums-own [beliefs desire intention own_color]
 
 ; --- Setup ---
 to setup
+
   clear-all
   set time 0
+
+  set num_sens round(vision_radius * pi / 10) + 1
+
   setup-vacuums
   setup-patches
   setup-ticks
@@ -95,7 +101,7 @@ to setup-patches
       set y random-ycor
     ]
     ask patch x y [
-      set pcolor [own_color] of one-of turtles
+      set pcolor [own_color] of one-of vacuums
     ]
     set ndirt (ndirt - 1)
   ]
@@ -106,15 +112,14 @@ end
 to setup-vacuums
    let colors [0] ;-- collection of colors
    let c_col 0 ;- current color
-   let i num_agents
-   while [i > 0][
-     set i i - 1
+   let i 0
+   while [i < num_agents][
+     set i i + 1
      ;-- checking if color is in the list already
      while [member? c_col colors][
          set c_col 5 + (random 14 * 10) + random 4
      ]
      set colors lput c_col colors
-     show(colors)
      create-vacuums 1 [
         let border 2
         let x random (min-pxcor + border) + random (max-pxcor - border)
@@ -130,6 +135,13 @@ to setup-vacuums
        set own_color c_col
        set beliefs []
   ]
+       let turtle_id (num_sens * (i - 1) + i - 1 )
+
+       create-sensors num_sens [
+         set shape "dot"
+         set color c_col
+         create-link-from turtle turtle_id
+         ]
 
      ]
 end
@@ -163,12 +175,16 @@ end
 ; --- Update beliefs ---
 to update-beliefs
   ask vacuums [
-
-   ifelse intention = "clear" [
+   ifelse intention = "clear" and not empty? beliefs[
      set beliefs remove-item 0 beliefs
    ] [
+     let ob_dirt observe-dirt own_color
+     if not empty? ob_dirt
+     [set beliefs sentence ob_dirt beliefs]
+     set beliefs remove-duplicates beliefs
      set beliefs sort-by [dist ?1 < dist ?2] beliefs
    ]
+
  ]
 end
 
@@ -183,22 +199,27 @@ end
 to update-intentions
     ask vacuums [
     if desire = "clean" [
-      let dest item 0 beliefs
+      ; -- check if any of the items were observed
+      ifelse empty? beliefs [set intention "search" ]
+      [let dest item 0 beliefs
       ifelse dest = list xcor ycor [
         set intention "clear"
       ] [
         set intention "go to dirt"
-      ]
+      ]]
     ]
   ]
 end
 
 ;--- scan the area in the specified radius
 ;--- returns found dirt of the passed color
-to-report color_vision [col]
+to-report observe-dirt [col]
+   let dirt []
    ask patches in-radius vision_radius[
-     report list xcor ycor
+     if pcolor = col
+     [set dirt lput list pxcor pycor dirt]
      ]
+   report dirt
 
 end
 ; --- Execute actions ---
@@ -207,6 +228,7 @@ to execute-actions
   ; Please note that your agents should perform only one action per tick!
   ask vacuums [
     if intention = "stop" [ stop ]
+    if intention = "search" [move]
     if intention = "clear" [
       ask patch xcor ycor [
         set pcolor white
@@ -226,12 +248,64 @@ to execute-actions
 end
 
 to draw-vision
-  ask turtles
-  [ let c own_color
-    ask patches in-radius vision_radius
-   [ set pcolor black] ; here I need transperant color but it does not work for patches...
-  ]
+  ask vacuums[
+    let i 0
+    let x xcor
+    let y xcor
+    ask  out-link-neighbors [
+       let angle i * round(2 * pi / num_sens)
+       set i i + 1
+       show angle
+       show vision_radius * cos angle
+       let x_new x + vision_radius * cos angle
+       let y_new y + vision_radius * cos angle
+       if x_new < max-pxcor and y_new < max-pycor and x_new > min-pxcor and y_new < max-pycor
+       [ set xcor x_new set ycor y_new ]
+       ]
+
+    ]
+
+
+;  [ let c own_color
+;      set pcolor black
+;      ] ; here I need transperant color but it does not work for patches...
+;  ]
 end
+
+
+to move
+  ifelse facing-wall? [ show "facing the wall" rt 180 ]
+  [ifelse random-rotate?
+    [ set heading random 360
+      show "randomly rotate"
+      show heading ]
+    [ forward 1 ]
+  ]
+
+end
+
+to-report random-rotate?
+  if random 100 < 20 [ report true ] ; random rotation
+  report false
+end
+
+
+to-report facing-wall?
+  show heading
+  ; -- right wall
+  if round(xcor) = max-pxcor and heading >= 0 and heading < 180 [report true]
+  ; -- left wall
+  if round(xcor) = min-pxcor and heading >= 180 and heading < 360 [report true]
+  ; -- upper wall
+  if round(ycor) = max-pycor and ( ( heading >= 270 and heading < 360 ) or (heading >= 0 and heading < 90 )) [report true]
+  ; -- bottom wall
+  if round(ycor) = min-pycor and (heading >= 90 and heading < 270 ) [report true]
+
+  report false
+end
+
+
+
 
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -270,7 +344,7 @@ dirt_pct
 dirt_pct
 0
 100
-7
+2
 1
 1
 NIL
@@ -334,9 +408,9 @@ SLIDER
 188
 num_agents
 num_agents
-2
+1
 7
-4
+1
 1
 1
 NIL
@@ -351,7 +425,7 @@ vision_radius
 vision_radius
 0
 100
-3
+56
 1
 1
 NIL
