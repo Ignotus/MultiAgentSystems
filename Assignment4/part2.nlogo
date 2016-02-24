@@ -43,20 +43,29 @@ breed [sensors sensor]
 ; 2) desire: the agent's current desire
 ; 3) intention: the agent's current intention
 ; 4) own_color: the agent's belief about its own target color
-vacuums-own [beliefs desire intention own_color]
+; 5) other_colors: the agent's belief about the target colors of other agents
+; 6) outgoing_messages: list of messages sent by the agent to other agents
+; 7) incoming_messages: list of messages received by the agent from other agents
+
+vacuums-own [beliefs desire intention own_color other_colors outgoing_messages incoming_messages]
 
 
 ; --- Setup ---
 to setup
   clear-all
-  set time 0
-  set num_sens round(vision_radius * pi / 2) + 1
-  set vacuum_ids []
+  setup-variables
   setup-vacuums
   hide-all-links
   setup-patches
   setup-ticks
   draw-vision
+end
+
+
+to setup-variables
+    set time 0
+  set num_sens round(vision_radius * pi / 2) + 1
+  set vacuum_ids []
 end
 
 
@@ -68,6 +77,7 @@ to go
   update-beliefs
   update-intentions
   execute-actions
+  send-messages
   draw-vision
   tick
   set time ticks
@@ -108,13 +118,13 @@ end
 
 ; --- Setup vacuums ---
 to setup-vacuums
-   let colors [0] ;-- collection of colors
+   let colors [] ;-- collection of colors
    let c_col 0 ;- current color
    let i 0
    while [i < num_agents][
-     set i i + 1
+
      ;-- checking if color is in the list already
-     while [member? c_col colors][
+     while [member? c_col colors or c_col = 0 ][
          set c_col 5 + (random 14 * 10) + random 4
      ]
      set colors lput c_col colors
@@ -131,16 +141,21 @@ to setup-vacuums
        set heading 0 ; 0 is North, 90 is East, ...
        set color c_col
        set own_color c_col
+       set incoming_messages []
+       set outgoing_messages []
        set beliefs []
   ]
-       let turtle_id (num_sens * (i - 1) + i - 1 )
+       let turtle_id (num_sens * i + i )
        create-sensors num_sens [
          set shape "dot"
          set color c_col
          create-link-from turtle turtle_id
          ]
        set vacuum_ids lput turtle_id vacuum_ids
-
+       set i i + 1
+     ]
+   ask vacuums [
+     set other_colors colors
      ]
 end
 
@@ -188,13 +203,26 @@ to update-beliefs
    ifelse intention = "clear" and not empty? beliefs[
      set beliefs remove-item 0 beliefs
    ] [
-     let ob_dirt observe-dirt own_color
-     if not empty? ob_dirt
-     [set beliefs sentence ob_dirt beliefs]
+     let dirts observe-dirt ; at this stage we will have several types of dirt (own and the one that we need to announce to other agents)
+     let own_dirt item 0 dirts
+
+     ; -- storing own dirt coordinates into beliefs
+     if not empty? own_dirt
+     [set beliefs sentence own_dirt beliefs]
+
+     ;-- storing new messages for other agents
+     let other_dirt item 1 dirts
+     if not empty? other_dirt
+     [set outgoing_messages remove-duplicate-messages (sentence outgoing_messages other_dirt)]
+
+     ; -- storing dirt that has been communicated about by other agents
+     let new_mes read-cords-messages
+     set beliefs sentence new_mes beliefs
+
+     ; -- final step
      set beliefs remove-duplicates beliefs
      set beliefs sort-by [dist ?1 < dist ?2] beliefs
    ]
-
  ]
 end
 
@@ -222,14 +250,23 @@ to update-intentions
 end
 
 ;--- scan the area in the specified radius
-;--- returns found dirt of the passed color
-to-report observe-dirt [col]
-   let dirt []
+;--- returns a list of found dirt of the passed color and other color dirts wrapped to messages
+to-report observe-dirt
+   let col own_color
+   let ocol other_colors
+   let own_dirt [] ; own color dirt
+   let messages [] ; other agent dirt messages
    ask patches in-radius vision_radius[
-     if pcolor = col
-     [set dirt lput list pxcor pycor dirt]
+     if pcolor = col [
+       set own_dirt lput list pxcor pycor own_dirt
+       ]
+     if member? pcolor ocol and pcolor != col [
+       let mes (list (list pxcor pycor) pcolor false)
+       if not (member? mes messages )
+       [set messages lput mes messages]
      ]
-   report dirt
+   ]
+   report (list own_dirt messages)
 
 end
 ; --- Execute actions ---
@@ -275,19 +312,12 @@ to draw-vision
        ]
 
     ]
-
-
-;  [ let c own_color
-;      set pcolor black
-;      ] ; here I need transperant color but it does not work for patches...
-;  ]
 end
 
 
 to move
   ifelse facing-wall? [
-    ;show "facing the wall"
-     rt 180 ]
+    rt 160 ]
   [ifelse random-rotate?
     [ set heading random 360 ]
     [ forward 1 ]
@@ -316,7 +346,67 @@ to-report facing-wall?
 end
 
 
+; --- Send messages ---
+to send-messages
+  ask vacuums[
+  let i 0
+  while [i < (length outgoing_messages)][
 
+     let mes item i outgoing_messages
+     if not item 2 mes  ;-- if it has not been sent
+     [ send-message mes
+       set mes replace-item 2 mes true
+       set outgoing_messages replace-item i outgoing_messages mes
+       ]
+     set i i + 1
+  ]
+  ]
+end
+
+to send-message [mes]
+  let col item 1 mes
+  let coord item 0 mes
+  ask vacuums with [own_color = col]
+  [
+    ; -- false stands for if a message has been read
+    set incoming_messages remove-duplicate-messages (lput (list coord false ) incoming_messages)
+  ]
+end
+
+
+to-report read-cords-messages
+    let i 0
+    let new_cords []
+    while [i < (length incoming_messages)][
+     let mes item i incoming_messages
+     if not item 1 mes  ;-- if it has not been read
+     [ set new_cords lput (item 0 mes) new_cords
+       set mes replace-item 1 mes true
+       set incoming_messages replace-item i incoming_messages mes
+       ]
+     set i i + 1
+  ]
+    report new_cords
+end
+
+
+; -- removes duplicate messages based on coordinates
+; -- under assumption that coords are at intdex 0
+to-report remove-duplicate-messages [coords]
+  let un_mes []
+  let un_cords []
+  let i 0
+  while [i < length coords][
+    let mes item i coords
+    let cord item 0 mes
+    if not member? cord un_cords[
+      set un_mes lput mes un_mes
+      set un_cords lput cord un_cords
+      ]
+    set i i + 1
+    ]
+  report un_mes
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 819
@@ -354,7 +444,7 @@ dirt_pct
 dirt_pct
 0
 100
-9
+1
 1
 1
 NIL
@@ -420,7 +510,7 @@ num_agents
 num_agents
 1
 7
-7
+2
 1
 1
 NIL
@@ -435,17 +525,17 @@ vision_radius
 vision_radius
 0
 100
-15
+4
 1
 1
 NIL
 HORIZONTAL
 
 MONITOR
-9
-349
-775
-394
+447
+260
+774
+305
 Intention of vacuum 1
 [intention] of vacuum 0
 17
@@ -453,10 +543,10 @@ Intention of vacuum 1
 11
 
 MONITOR
-9
-393
-775
-438
+8
+306
+774
+351
 Desire of vacuum 1
 [desire] of vacuum 0
 17
@@ -464,10 +554,10 @@ Desire of vacuum 1
 11
 
 MONITOR
-9
-305
-775
-350
+211
+261
+447
+306
 Beliefs of vacuum 1
 [beliefs] of vacuum 0
 17
@@ -475,10 +565,10 @@ Beliefs of vacuum 1
 11
 
 MONITOR
-10
-497
-776
-542
+208
+423
+450
+468
 Beliefs of vacuum 2
 [beliefs] of vacuum (item 1 vacuum_ids)
 17
@@ -488,19 +578,19 @@ Beliefs of vacuum 2
 MONITOR
 9
 262
-775
+212
 307
 Color of vacuum 1
-[own_color] of vacuum (item 0 vacuum_ids)
+[own_color] of vacuum 0
 17
 1
 11
 
 MONITOR
 10
-453
-776
-498
+423
+209
+468
 Color of vacuum 2
 [own_color] of vacuum (item 1 vacuum_ids)
 17
@@ -508,10 +598,10 @@ Color of vacuum 2
 11
 
 MONITOR
-10
-541
-776
-586
+450
+423
+773
+468
 Intention of vacuum 2
 [intention] of vacuum (item 1 vacuum_ids)
 17
@@ -520,9 +610,9 @@ Intention of vacuum 2
 
 MONITOR
 10
-585
-776
-630
+467
+773
+512
 Desire of vacuum 2
 [desire] of vacuum (item 1 vacuum_ids)
 17
@@ -531,9 +621,9 @@ Desire of vacuum 2
 
 MONITOR
 11
-642
-777
-687
+585
+208
+630
 Color of vacuum 3
 [own_color] of vacuum (item 2 vacuum_ids)
 17
@@ -541,10 +631,10 @@ Color of vacuum 3
 11
 
 MONITOR
-11
-686
-777
-731
+207
+585
+450
+630
 Beliefs of vacuum 3
 [beliefs] of vacuum (item 2 vacuum_ids)
 17
@@ -552,10 +642,10 @@ Beliefs of vacuum 3
 11
 
 MONITOR
-11
-730
-777
+449
+585
 775
+630
 Intention of vacuum 3
 [intention] of vacuum (item 2 vacuum_ids)
 17
@@ -564,9 +654,9 @@ Intention of vacuum 3
 
 MONITOR
 11
-774
-777
-819
+630
+775
+675
 Desire of vacuum 3
 [desire] of vacuum (item 2 vacuum_ids)
 17
@@ -580,6 +670,72 @@ MONITOR
 63
 Time to complete the task.
 time
+17
+1
+11
+
+MONITOR
+8
+351
+376
+396
+Outgoing messages of vacuum 1
+[outgoing_messages] of vacuum 0
+17
+1
+11
+
+MONITOR
+11
+512
+374
+557
+Outgoing messages of vacuum 2
+[outgoing_messages] of vacuum (item 1 vacuum_ids)
+17
+1
+11
+
+MONITOR
+11
+674
+375
+719
+Outgoing messages of vacuum 3
+[outgoing_messages] of vacuum (item 2 vacuum_ids)
+17
+1
+11
+
+MONITOR
+376
+351
+773
+396
+Incoming messages of vacuum 1
+[incoming_messages] of vacuum (item 0 vacuum_ids)
+17
+1
+11
+
+MONITOR
+373
+512
+773
+557
+Incoming messages of vacuum 2
+[incoming_messages] of vacuum (item 1 vacuum_ids)
+17
+1
+11
+
+MONITOR
+375
+674
+775
+719
+Incoming messages of vacuum 3
+[incoming_messages] of vacuum (item 2 vacuum_ids)
 17
 1
 11
