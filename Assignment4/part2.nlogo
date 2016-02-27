@@ -63,7 +63,7 @@ end
 
 
 to setup-variables
-    set time 0
+  set time 0
   set num_sens round(vision_radius * pi / 2) + 1
   set vacuum_ids []
 end
@@ -85,15 +85,14 @@ to go
 end
 
 to-report finished?
-  report count vacuums with [desire = "stop"] =  count vacuums
+  report count vacuums with [desire = "stop"] = count vacuums
 end
 
 ; --- Setup patches ---
 to setup-patches
-    ask patches [
+  ask patches [
     set pcolor white
   ]
-  let i dirt_pct
   let width (max-pxcor - min-pxcor + 1)
   let height (max-pycor - min-pycor + 1)
   let ncells (width * height)
@@ -104,7 +103,7 @@ to setup-patches
     let x random-xcor
     let y random-ycor
     ; -- I check if it's unique turtle coordinate because otherwise same color turles blend with dirt
-    while [ [pcolor] of patch x y != white and unique_turtle_cord x y != true] [
+    while [ [pcolor] of patch x y != white or unique_turtle_coord? x y ] [
       set x random-xcor
       set y random-ycor
     ]
@@ -118,63 +117,56 @@ end
 
 ; --- Setup vacuums ---
 to setup-vacuums
-   let colors [] ;-- collection of colors
-   let c_col 0 ;- current color
-   let i 0
-   while [i < num_agents][
-
-     ;-- checking if color is in the list already
-     while [member? c_col colors or c_col = 0 ][
-         set c_col 5 + (random 14 * 10) + random 4
-     ]
-     set colors lput c_col colors
-     create-vacuums 1 [
-        let border 2
-        let x random (min-pxcor + border) + random (max-pxcor - border)
-        let y random (min-pycor + border) + random (max-pycor - border)
-
-    while [unique_turtle_cord x y = true] [
-      set x random (min-pxcor + border) + random (max-pxcor - border)
-      set y random (min-pycor + border) + random (max-pycor - border)
+  let colors [] ;-- collection of colors
+  let c_col 0 ;- current color
+  let i 0
+  while [ i < num_agents ] [
+    ;-- checking if color is in the list already
+    while [ member? c_col colors or c_col = 0 ] [
+      set c_col 5 + (random 14 * 10) + random 4
     ]
-       setxy x y
-       set heading 0 ; 0 is North, 90 is East, ...
-       set color c_col
-       set own_color c_col
-       set incoming_messages []
-       set outgoing_messages []
-       set beliefs []
+    set colors lput c_col colors
+    create-vacuums 1 [
+      let x random-xcor
+      let y random-ycor
+      while [ unique_turtle_coord? x y ] [
+        set x random-xcor
+        set y random-ycor
+      ]
+      setxy x y
+      set heading 0 ; 0 is North, 90 is East, ...
+      set own_color c_col
+      set color c_col
+      set incoming_messages []
+      set outgoing_messages []
+      set beliefs []
+    ]
+    let turtle_id (num_sens * i + i )
+    create-sensors num_sens [
+      set shape "dot"
+      set color c_col
+      create-link-from turtle turtle_id
+    ]
+    set vacuum_ids lput turtle_id vacuum_ids
+    set i i + 1
   ]
-       let turtle_id (num_sens * i + i )
-       create-sensors num_sens [
-         set shape "dot"
-         set color c_col
-         create-link-from turtle turtle_id
-         ]
-       set vacuum_ids lput turtle_id vacuum_ids
-       set i i + 1
-     ]
-   ask vacuums [
-     set other_colors colors
-     ]
+  ask vacuums [
+    set other_colors filter [ not (own_color = ?) ] colors
+  ]
 end
 
 ; -- checks if a turtle coordinate is unique
-to-report unique_turtle_cord [x y]
-    ifelse any? turtles with [abs (ycor - y) = 0 and abs ( xcor - x) = 0 ] [
-      report[false]
-    ][report [true]]
+to-report unique_turtle_coord? [x y]
+  report any? turtles with [ ycor = y and xcor = x ]
 end
 
 ; --- Setup ticks ---
 to setup-ticks
-    reset-ticks
+  reset-ticks
 end
-
 
 to hide-all-links
   ask links [hide-link]
-
 end
 
 
@@ -182,48 +174,50 @@ end
 to update-desires
   ; You should update your agent's desires here.
   ; Keep in mind that now you have more than one agent.
-    ask vacuums [
-    ifelse no-dirt-with-color?  = true
-    [set desire "stop"]
-    [set desire "clean"]
+  ask vacuums [
+    ifelse no-dirt-with-color? [
+      set desire "stop"
+    ] [
+      set desire "clean"
     ]
+  ]
 end
 
 
 to-report no-dirt-with-color?
-  let c own_color
-  ifelse count patches with [ pcolor = c ] = 0
-  [report true]
-  [report false]
+  let c own_color ;necessary to avoid contex errors
+  report count patches with [ pcolor = c ] = 0
 end
 
 ; --- Update beliefs ---
 to update-beliefs
   ask vacuums [
-   ifelse intention = "clear" and not empty? beliefs[
-     set beliefs remove-item 0 beliefs
-   ] [
-     let dirts observe-dirt ; at this stage we will have several types of dirt (own and the one that we need to announce to other agents)
-     let own_dirt item 0 dirts
+    ifelse intention = "clear" and not empty? beliefs [
+      set beliefs remove-item 0 beliefs
+    ] [
+      let dirts observe-dirt ; at this stage we will have several types of dirt (own and the one that we need to announce to other agents)
+      let own_dirt item 0 dirts
 
-     ; -- storing own dirt coordinates into beliefs
-     if not empty? own_dirt
-     [set beliefs sentence own_dirt beliefs]
+      ; -- storing own dirt coordinates into beliefs
+      if not empty? own_dirt [
+        set beliefs sentence own_dirt beliefs
+      ]
 
-     ;-- storing new messages for other agents
-     let other_dirt item 1 dirts
-     if not empty? other_dirt
-     [set outgoing_messages remove-duplicate-messages (sentence outgoing_messages other_dirt)]
+      ;-- storing new messages for other agents
+      let other_dirt item 1 dirts
+      if not empty? other_dirt [
+        set outgoing_messages remove-duplicate-messages (sentence outgoing_messages other_dirt)
+      ]
 
-     ; -- storing dirt that has been communicated about by other agents
-     let new_mes read-cords-messages
-     set beliefs sentence new_mes beliefs
+      ; -- storing dirt that has been communicated about by other agents
+      let new_mes read-cords-messages
+      set beliefs sentence new_mes beliefs
 
-     ; -- final step
-     set beliefs remove-duplicates beliefs
-     set beliefs sort-by [dist ?1 < dist ?2] beliefs
-   ]
- ]
+      ; -- final step
+      set beliefs remove-duplicates beliefs
+      set beliefs sort-by [dist ?1 < dist ?2] beliefs
+    ]
+  ]
 end
 
 to-report dist [ coordinate ]
@@ -235,16 +229,20 @@ end
 
 ; --- Update intentions ---
 to update-intentions
-    ask vacuums [
+  ask vacuums [
+    if desire = "stop" [ set intention "stop" ]
     if desire = "clean" [
       ; -- check if any of the items were observed
-      ifelse empty? beliefs [set intention "search" ]
-      [let dest item 0 beliefs
-      ifelse dest = list xcor ycor [
-        set intention "clear"
+      ifelse empty? beliefs [
+        set intention "search"
       ] [
-        set intention "go to dirt"
-      ]]
+        let dest item 0 beliefs
+        ifelse dest = list xcor ycor [
+          set intention "clear"
+        ] [
+          set intention "go to dirt"
+        ]
+      ]
     ]
   ]
 end
@@ -252,30 +250,31 @@ end
 ;--- scan the area in the specified radius
 ;--- returns a list of found dirt of the passed color and other color dirts wrapped to messages
 to-report observe-dirt
-   let col own_color
-   let ocol other_colors
-   let own_dirt [] ; own color dirt
-   let messages [] ; other agent dirt messages
-   ask patches in-radius vision_radius[
-     if pcolor = col [
-       set own_dirt lput list pxcor pycor own_dirt
-       ]
-     if member? pcolor ocol and pcolor != col [
-       let mes (list (list pxcor pycor) pcolor false)
-       if not (member? mes messages )
-       [set messages lput mes messages]
-     ]
-   ]
-   report (list own_dirt messages)
-
+  let col own_color ; avoid context errors
+  let ocol other_colors ; avoid context errors
+  let own_dirt [] ; own color dirt
+  let messages [] ; other agent dirt messages
+  ask patches in-radius vision_radius [
+    if pcolor = col [
+      set own_dirt lput list pxcor pycor own_dirt
+    ]
+    if member? pcolor ocol [
+      let mes (list (list pxcor pycor) pcolor false)
+      if not (member? mes messages ) [
+        set messages lput mes messages
+      ]
+    ]
+  ]
+  report (list own_dirt messages)
 end
+
 ; --- Execute actions ---
 to execute-actions
   ; Here you should put the code related to the actions performed by your agent: moving, cleaning, and (actively) looking around.
   ; Please note that your agents should perform only one action per tick!
   ask vacuums [
     if intention = "stop" [ stop ]
-    if intention = "search" [move]
+    if intention = "search" [ move ]
     if intention = "clear" [
       ask patch xcor ycor [
         set pcolor white
@@ -301,28 +300,30 @@ to draw-vision
     let y ycor
 
     ask out-link-neighbors [
-       let angle (i * 2 * pi / num_sens) * 180 / pi
-       set i i + 1
-       let x_new (x + vision_radius * cos angle)
-       let y_new (y + vision_radius * sin angle)
-       ifelse x_new < max-pxcor and y_new < max-pycor and x_new > min-pxcor and y_new > min-pycor
-       [ show-turtle set xcor x_new set ycor y_new ]
-       [ hide-turtle ]
-
-       ]
-
+      let angle (i * 2 * pi / num_sens) * 180 / pi
+      set i i + 1
+      let x_new (x + vision_radius * cos angle)
+      let y_new (y + vision_radius * sin angle)
+      ifelse x_new < max-pxcor and y_new < max-pycor and x_new > min-pxcor and y_new > min-pycor [
+        show-turtle set xcor x_new set ycor y_new
+      ] [
+        hide-turtle
+      ]
     ]
+  ]
 end
 
 
 to move
   ifelse facing-wall? [
-    rt 160 ]
-  [ifelse random-rotate?
-    [ set heading random 360 ]
-    [ forward 1 ]
+    rt 160
+  ] [
+    ifelse random-rotate? [
+      set heading random 360
+    ] [
+      forward 1
+    ]
   ]
-
 end
 
 to-report random-rotate?
@@ -349,62 +350,60 @@ end
 ; --- Send messages ---
 to send-messages
   ask vacuums[
-  let i 0
-  while [i < (length outgoing_messages)][
-
-     let mes item i outgoing_messages
-     if not item 2 mes  ;-- if it has not been sent
-     [ send-message mes
-       set mes replace-item 2 mes true
-       set outgoing_messages replace-item i outgoing_messages mes
-       ]
-     set i i + 1
-  ]
+    let i 0
+    while [ i < (length outgoing_messages) ] [
+      let mes item i outgoing_messages
+      if not item 2 mes [ ;-- if it has not been sent
+        send-message mes
+        set mes replace-item 2 mes true
+        set outgoing_messages replace-item i outgoing_messages mes
+      ]
+      set i i + 1
+    ]
   ]
 end
 
 to send-message [mes]
   let col item 1 mes
   let coord item 0 mes
-  ask vacuums with [own_color = col]
-  [
+  ask vacuums with [own_color = col] [
     ; -- false stands for if a message has been read
-    set incoming_messages remove-duplicate-messages (lput (list coord false ) incoming_messages)
+    set incoming_messages remove-duplicate-messages (lput (list coord false) incoming_messages)
   ]
 end
 
 
 to-report read-cords-messages
-    let i 0
-    let new_cords []
-    while [i < (length incoming_messages)][
-     let mes item i incoming_messages
-     if not item 1 mes  ;-- if it has not been read
-     [ set new_cords lput (item 0 mes) new_cords
-       set mes replace-item 1 mes true
-       set incoming_messages replace-item i incoming_messages mes
-       ]
-     set i i + 1
+  let i 0
+  let new_cords []
+  while [i < (length incoming_messages)] [
+    let mes item i incoming_messages
+    if not item 1 mes [ ;-- if it has not been read
+      set new_cords lput (item 0 mes) new_cords
+      set mes replace-item 1 mes true
+      set incoming_messages replace-item i incoming_messages mes
+    ]
+    set i i + 1
   ]
-    report new_cords
+  report new_cords
 end
 
 
 ; -- removes duplicate messages based on coordinates
 ; -- under assumption that coords are at intdex 0
-to-report remove-duplicate-messages [coords]
+to-report remove-duplicate-messages [ coords ]
   let un_mes []
   let un_cords []
   let i 0
-  while [i < length coords][
+  while [ i < length coords ] [
     let mes item i coords
     let cord item 0 mes
-    if not member? cord un_cords[
+    if not member? cord un_cords [
       set un_mes lput mes un_mes
       set un_cords lput cord un_cords
-      ]
-    set i i + 1
     ]
+    set i i + 1
+  ]
   report un_mes
 end
 @#$#@#$#@

@@ -75,15 +75,14 @@ to go
 end
 
 to-report finished?
-  report count vacuums with [desire = "stop"] =  count vacuums
+  report count vacuums with [desire = "stop"] = count vacuums
 end
 
 ; --- Setup patches ---
 to setup-patches
-    ask patches [
+  ask patches [
     set pcolor white
   ]
-  let i dirt_pct
   let width (max-pxcor - min-pxcor + 1)
   let height (max-pycor - min-pycor + 1)
   let ncells (width * height)
@@ -94,7 +93,7 @@ to setup-patches
     let x random-xcor
     let y random-ycor
     ; -- I check if it's unique turtle coordinate because otherwise same color turles blend with dirt
-    while [ [pcolor] of patch x y != white and unique_turtle_cord x y != true] [
+    while [ [pcolor] of patch x y != white or unique_turtle_coord? x y ] [
       set x random-xcor
       set y random-ycor
     ]
@@ -108,58 +107,52 @@ end
 
 ; --- Setup vacuums ---
 to setup-vacuums
-   let colors [0] ;-- collection of colors
-   let c_col 0 ;- current color
-   let i 0
-   while [i < num_agents][
-     set i i + 1
-     ;-- checking if color is in the list already
-     while [member? c_col colors][
-         set c_col 5 + (random 14 * 10) + random 4
-     ]
-     set colors lput c_col colors
-     create-vacuums 1 [
-        let border 2
-        let x random (min-pxcor + border) + random (max-pxcor - border)
-        let y random (min-pycor + border) + random (max-pycor - border)
-
-    while [unique_turtle_cord x y = true] [
-      set x random (min-pxcor + border) + random (max-pxcor - border)
-      set y random (min-pycor + border) + random (max-pycor - border)
+  let colors [0] ;-- collection of colors
+  let c_col 0 ;- current color
+  let i 0
+  while [i < num_agents] [
+    set i i + 1
+    ;-- checking if color is in the list already
+    while [member? c_col colors] [
+      set c_col 5 + (random 14 * 10) + random 4
     ]
-       setxy x y
-       set heading 0 ; 0 is North, 90 is East, ...
-       set color c_col
-       set own_color c_col
-       set beliefs []
+    set colors lput c_col colors
+    create-vacuums 1 [
+      let x random-xcor
+      let y random-ycor
+      while [ unique_turtle_coord? x y ] [
+        set x random-xcor
+        set y random-ycor
+      ]
+      setxy x y
+      set heading 0 ; 0 is North, 90 is East, ...
+      set own_color c_col
+      set color own_color
+      set beliefs []
+    ]
+    let turtle_id (num_sens * (i - 1) + i - 1 )
+    create-sensors num_sens [
+      set shape "dot"
+      set color c_col
+      create-link-from turtle turtle_id
+    ]
+    set vacuum_ids lput turtle_id vacuum_ids
   ]
-       let turtle_id (num_sens * (i - 1) + i - 1 )
-       create-sensors num_sens [
-         set shape "dot"
-         set color c_col
-         create-link-from turtle turtle_id
-         ]
-       set vacuum_ids lput turtle_id vacuum_ids
-
-     ]
 end
 
 ; -- checks if a turtle coordinate is unique
-to-report unique_turtle_cord [x y]
-    ifelse any? turtles with [abs (ycor - y) = 0 and abs ( xcor - x) = 0 ] [
-      report[false]
-    ][report [true]]
+to-report unique_turtle_coord? [x y]
+  report any? vacuums with [ xcor = x and ycor = x ]
 end
 
 ; --- Setup ticks ---
 to setup-ticks
-    reset-ticks
+  reset-ticks
 end
 
 
 to hide-all-links
   ask links [hide-link]
-
 end
 
 
@@ -167,35 +160,35 @@ end
 to update-desires
   ; You should update your agent's desires here.
   ; Keep in mind that now you have more than one agent.
-    ask vacuums [
-    ifelse no-dirt-with-color?  = true
-    [set desire "stop"]
-    [set desire "clean"]
+  ask vacuums [
+    ifelse no-dirt-with-color? [
+      set desire "stop"
+    ] [
+      set desire "clean"
     ]
+  ]
 end
 
 
 to-report no-dirt-with-color?
-  let c own_color
-  ifelse count patches with [ pcolor = c ] = 0
-  [report true]
-  [report false]
+  let c own_color ; needed to avoid context errors
+  report count patches with [ pcolor = c ] = 0
 end
 
 ; --- Update beliefs ---
 to update-beliefs
   ask vacuums [
-   ifelse intention = "clear" and not empty? beliefs[
-     set beliefs remove-item 0 beliefs
-   ] [
-     let ob_dirt observe-dirt own_color
-     if not empty? ob_dirt
-     [set beliefs sentence ob_dirt beliefs]
-     set beliefs remove-duplicates beliefs
-     set beliefs sort-by [dist ?1 < dist ?2] beliefs
-   ]
-
- ]
+    ifelse intention = "clear" and not empty? beliefs [
+      set beliefs remove-item 0 beliefs
+    ] [
+      let ob_dirt observe-dirt own_color
+      if not empty? ob_dirt [
+        set beliefs sentence ob_dirt beliefs
+      ]
+      set beliefs remove-duplicates beliefs
+      set beliefs sort-by [dist ?1 < dist ?2] beliefs
+    ]
+  ]
 end
 
 to-report dist [ coordinate ]
@@ -207,31 +200,36 @@ end
 
 ; --- Update intentions ---
 to update-intentions
-    ask vacuums [
+  ask vacuums [
+    if desire = "stop" [ set intention "stop" ]
     if desire = "clean" [
       ; -- check if any of the items were observed
-      ifelse empty? beliefs [set intention "search" ]
-      [let dest item 0 beliefs
-      ifelse dest = list xcor ycor [
-        set intention "clear"
+      ifelse empty? beliefs [
+        set intention "search"
       ] [
-        set intention "go to dirt"
-      ]]
+        let dest item 0 beliefs
+        ifelse dest = list xcor ycor [
+          set intention "clear"
+        ] [
+          set intention "go to dirt"
+        ]
+      ]
     ]
   ]
 end
 
 ;--- scan the area in the specified radius
 ;--- returns found dirt of the passed color
-to-report observe-dirt [col]
-   let dirt []
-   ask patches in-radius vision_radius[
-     if pcolor = col
-     [set dirt lput list pxcor pycor dirt]
-     ]
-   report dirt
-
+to-report observe-dirt [ col ]
+  let dirt []
+  ask patches in-radius vision_radius [
+    if pcolor = col [
+      set dirt lput list pxcor pycor dirt
+    ]
+  ]
+  report dirt
 end
+
 ; --- Execute actions ---
 to execute-actions
   ; Here you should put the code related to the actions performed by your agent: moving, cleaning, and (actively) looking around.
@@ -258,25 +256,25 @@ to execute-actions
 end
 
 to draw-vision
-  ask vacuums[
+  ask vacuums [
     let i 0
     let x xcor
     let y ycor
 
     ask out-link-neighbors [
-       let angle (i * 2 * pi / num_sens) * 180 / pi
-       set i i + 1
-       let x_new (x + vision_radius * cos angle)
-       let y_new (y + vision_radius * sin angle)
-       ifelse x_new < max-pxcor and y_new < max-pycor and x_new > min-pxcor and y_new > min-pycor
-       [ show-turtle set xcor x_new set ycor y_new ]
-       [ hide-turtle ]
-
-       ]
-
+      let angle (i * 2 * pi / num_sens) * 180 / pi
+      set i i + 1
+      let x_new (x + vision_radius * cos angle)
+      let y_new (y + vision_radius * sin angle)
+      ifelse x_new < max-pxcor and y_new < max-pycor and x_new > min-pxcor and y_new > min-pycor [
+        show-turtle
+        setxy x_new y_new
+;        show-turtle set xcor x_new set ycor y_new
+      ] [
+        hide-turtle
+      ]
     ]
-
-
+  ]
 ;  [ let c own_color
 ;      set pcolor black
 ;      ] ; here I need transperant color but it does not work for patches...
@@ -287,36 +285,35 @@ end
 to move
   ifelse facing-wall? [
     ;show "facing the wall"
-     rt 180 ]
-  [ifelse random-rotate?
-    [ set heading random 360 ]
-    [ forward 1 ]
+    ;rt 180 gets stuck in corners every now and then
+    rt 90
+  ] [
+    ifelse random-rotate? [
+      set heading random 360
+    ] [
+      forward 1
+    ]
   ]
-
 end
 
 to-report random-rotate?
-  if random 100 < 20 [ report true ] ; random rotation
-  report false
+  report random 100 < 20 ; random rotation
 end
 
 
 to-report facing-wall?
   ;show heading
   ; -- right wall
-  if round(xcor) = max-pxcor and heading >= 0 and heading < 180 [report true]
+  if round(xcor) = max-pxcor and heading < 180 [report true]
   ; -- left wall
-  if round(xcor) = min-pxcor and heading >= 180 and heading < 360 [report true]
+  if round(xcor) = min-pxcor and heading >= 180 [report true]
   ; -- upper wall
-  if round(ycor) = max-pycor and ( ( heading >= 270 and heading < 360 ) or (heading >= 0 and heading < 90 )) [report true]
+  if round(ycor) = max-pycor and (heading >= 270 or heading < 90) [report true]
   ; -- bottom wall
-  if round(ycor) = min-pycor and (heading >= 90 and heading < 270 ) [report true]
+  if round(ycor) = min-pycor and heading >= 90 and heading < 270 [report true]
 
   report false
 end
-
-
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 819
