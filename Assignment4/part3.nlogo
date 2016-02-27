@@ -25,7 +25,7 @@
 ; 1) total_dirty: this variable represents the amount of dirty cells in the environment.
 ; 2) time: the total simulation time.
 ; 3) num_ses: number of sensors around cleaners
-globals [total_dirty time num_sens vacuum_ids]
+globals [total_dirty time num_sens vacuum_ids undecided_color]
 
 
 ; --- Agents ---
@@ -66,6 +66,7 @@ to setup-variables
   set time 0
   set num_sens round(vision_radius * pi / 2) + 1
   set vacuum_ids []
+  set undecided_color black
 end
 
 
@@ -143,12 +144,11 @@ to setup-vacuums
       ]
       setxy x y
       set heading 0 ; 0 is North, 90 is East, ...
-      set own_color black ;start with a neutral color - black
+      set own_color undecided_color ;start with a neutral color - undecided_color
       set color own_color
       set incoming_messages []
       set outgoing_messages []
       set beliefs []
-      set other_colors []
     ]
     let turtle_id (num_sens * i + i )
     create-sensors num_sens [
@@ -192,7 +192,7 @@ end
 
 to-report no-dirt-with-color?
   let c own_color ;necessary to avoid contex errors
-  if own_color = black [ ; does not have a color yet
+  if own_color = undecided_color [ ; does not have a color yet
     report false
   ]
   report count patches with [ pcolor = c ] = 0
@@ -204,36 +204,19 @@ to update-beliefs
     ifelse intention = "clear" and not empty? beliefs [
       set beliefs remove-item 0 beliefs
     ] [
-      ifelse own_color = black [
-        let dirts observe-dirt ; at this stage we only have other color dirt
-
-        let other_dirts item 1 dirts
+      ifelse own_color = undecided_color [
+        let other_dirts item 1 observe-dirt ; at this stage we only have other color dirt
         if not empty? other_dirts [
           set outgoing_messages remove-duplicate-messages (sentence outgoing_messages other_dirts)
         ]
 
-        let color_counts count_observed_dirt_colors
-        set color_counts sort-by [ item 0 ?1 > item 0 ?2] color_counts
-        let i 0
-        let chose_color false
-        while [ i < length color_counts and not chose_color ] [
-          let col_count item i color_counts
-          let c_count item 0 col_count
-          let col item 1 col_count
-          if c_count > beliefs_threshold and count vacuums with [ own_color = col ] = 0 [
-            set own_color col
-            set color own_color
-            set chose_color true
-            ask out-link-neighbors [
-              set color col
-            ]
-            set beliefs map [ item 0 ? ] filter [ item 1 ?1 = own_color ] outgoing_messages
-            set outgoing_messages filter [ item 1 ?1 != own_color ] outgoing_messages
-
-            set beliefs remove-duplicates beliefs
-            set beliefs sort-by [dist ?1 < dist ?2] beliefs
+        if choose-color? [
+          let col own_color ; avoid context error
+          ask out-link-neighbors [
+            set color col
           ]
-          set i i + 1
+          set beliefs map [ item 0 ? ] filter [ item 1 ?1 = own_color ] outgoing_messages
+          set outgoing_messages filter [ item 1 ?1 != own_color ] outgoing_messages
         ]
       ] [
         let dirts observe-dirt ; at this stage we will have several types of dirt (own and the one that we need to announce to other agents)
@@ -253,11 +236,10 @@ to update-beliefs
         ; -- storing dirt that has been communicated about by other agents
         let new_mes read-coords-messages
         set beliefs sentence new_mes beliefs
-
-        ; -- final step
-        set beliefs remove-duplicates beliefs
-        set beliefs sort-by [dist ?1 < dist ?2] beliefs
       ]
+      ; -- final step
+      set beliefs remove-duplicates beliefs
+      set beliefs sort-by [dist ?1 < dist ?2] beliefs
     ]
   ]
 end
@@ -268,7 +250,26 @@ to-report dist [ coordinate ]
   report (xcor - x) * (xcor - x) + (ycor - y) * (ycor - y)
 end
 
-to-report count_observed_dirt_colors
+to-report choose-color?
+  let color_counts count-observed-dirt-colors
+  set color_counts sort-by [ item 0 ?1 > item 0 ?2] color_counts
+  let i 0
+  let chose_color false
+  while [ i < length color_counts and not chose_color ] [
+    let col_count item i color_counts
+    let c_count item 0 col_count
+    let col item 1 col_count
+    if c_count > beliefs_threshold and count vacuums with [ own_color = col ] = 0 [
+      set own_color col
+      set color own_color
+      set chose_color true
+    ]
+    set i i + 1
+  ]
+  report chose_color
+end
+
+to-report count-observed-dirt-colors
   let color_counts []
   let i 0
   while [ i < length outgoing_messages ] [
@@ -288,7 +289,6 @@ to-report count_observed_dirt_colors
     ]
     set i i + 1
   ]
-  show color_counts
   report color_counts
 end
 
@@ -414,7 +414,7 @@ end
 ; --- Send messages ---
 to send-messages
   ask vacuums[
-    if own_color = black [ ;do not send messages
+    if own_color = undecided_color [ ;do not send messages
       stop
     ]
     let i 0
