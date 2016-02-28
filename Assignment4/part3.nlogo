@@ -64,7 +64,7 @@ end
 
 to setup-variables
   set time 0
-  set num_sens round(vision_radius * pi / 2) + 1
+  set num_sens round(vision_radius * pi / 0.4) + 1
   set vacuum_ids []
   set undecided_color black
 end

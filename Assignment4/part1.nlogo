@@ -50,7 +50,7 @@ vacuums-own [beliefs desire intention own_color]
 to setup
   clear-all
   set time 0
-  set num_sens round(vision_radius * pi / 2) + 1
+  set num_sens round(vision_radius * pi / 0.4) + 1
   set vacuum_ids []
   setup-vacuums
   hide-all-links
@@ -351,7 +351,7 @@ dirt_pct
 dirt_pct
 0
 100
-9
+2
 1
 1
 NIL
@@ -432,7 +432,7 @@ vision_radius
 vision_radius
 0
 100
-15
+2
 1
 1
 NIL
