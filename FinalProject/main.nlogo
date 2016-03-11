@@ -129,9 +129,29 @@ to go
   update-intentions
   execute-actions
 
+  if is-morning? [ shoot ]
+
   tick
 
   ifelse is-morning? [ set time "day" ] [set time "night" ]
+end
+
+to shoot
+  let max_vote_player 0
+  let max_vote item 0 votes
+  let i 1
+  loop [
+    if max_vote < item i votes [
+      set max_vote (item i votes)
+      set max_vote_player i
+    ]
+    set i i + 1
+    if i = num-players [ stop ]
+  ]
+
+  ask player max_vote_player [
+    set alive false
+  ]
 end
 
 to update-desires
@@ -175,9 +195,23 @@ end
 
 to execute-actions-mafia
   let num_players num-players
-  ask players with [role = "mafia"] [
+  ask players with [role = "mafia" and alive = true ] [
     ifelse is-morning? [
       ; Vote
+      let j num_mafia
+      loop [
+        ask player j [
+          if alive = true [
+            ; Vote against the first guy!
+            set votes replace-item j votes ((item j votes) + 1)
+            stop
+          ]
+        ]
+        set j j + 1
+        if j = num_players [
+          stop
+        ]
+      ]
     ] [
       ; Kill citizens
       let j num_mafia
@@ -200,6 +234,26 @@ to execute-actions-mafia
 end
 
 to execute-actions-citizen
+  let num_players num-players
+  ask players with [role = "citizen" and alive = true] [
+    if is-morning? [
+      ; Vote
+      let j 0
+      loop [
+        ask player j [
+          if alive = true [
+            ; Vote against the first guy!
+            set votes replace-item j votes ((item j votes) + 1)
+            stop
+          ]
+        ]
+        set j j + 1
+        if j = num_players [
+          stop
+        ]
+      ]
+    ]
+  ]
 end
 
 @#$#@#$#@
