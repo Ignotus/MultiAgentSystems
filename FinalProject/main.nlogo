@@ -1,8 +1,8 @@
-globals [time]
+globals [time votes]
 
 breed [players player]
 
-players-own [role belief_roles_mafia belief_roles_citizen belief_danger]
+players-own [alive role belief_roles_mafia belief_roles_citizen belief_danger]
 
 to setup
   clear-all
@@ -20,21 +20,26 @@ to setup-variables
 end
 
 to setup-roles
-  let num_players num_mafia + num_citizen
+  let num_players num-players
   create-players num_players
 
   ask players [
     set belief_roles_mafia (list)
     set belief_roles_citizen (list)
     set belief_danger (list)
+    set alive true
   ]
 
   setup-mafia
   setup-citizen
 end
 
+to-report num-players
+  report num_mafia + num_citizen
+end
+
 to setup-mafia
-  let num_players num_mafia + num_citizen
+  let num_players num-players
   let i 0
   loop [
     ask player i [
@@ -66,7 +71,7 @@ to setup-mafia
 end
 
 to setup-citizen
-  let num_players num_mafia + num_citizen
+  let num_players num-players
   let i 0
   loop [
     let player_id num_mafia + i
@@ -107,6 +112,18 @@ end
 
 
 to go
+  if is-morning? [
+    set votes (list)
+    let num_players num-players
+
+    let i 0
+    loop [
+      set votes lput 0 votes
+      set i i + 1
+      if i = num_players [ stop ]
+    ]
+  ]
+
   update-desires
   update-beliefs
   update-intentions
@@ -118,16 +135,73 @@ to go
 end
 
 to update-desires
+  update-desires-mafia
+  update-desires-citizen
+end
+
+to update-desires-mafia
+end
+
+to update-desires-citizen
 end
 
 to update-beliefs
+  update-beliefs-mafia
+  update-beliefs-citizen
+end
+
+to update-beliefs-mafia
+  ; TODO: Update danger for mafia
+end
+
+to update-beliefs-citizen
 end
 
 to update-intentions
+  update-intentions-mafia
+  update-intentions-citizen
+end
+
+to update-intentions-mafia
+end
+
+to update-intentions-citizen
 end
 
 to execute-actions
+  execute-actions-mafia
+  execute-actions-citizen
 end
+
+to execute-actions-mafia
+  let num_players num-players
+  ask players with [role = "mafia"] [
+    ifelse is-morning? [
+      ; Vote
+    ] [
+      ; Kill citizens
+      let j num_mafia
+      loop [
+        ask player j [
+          if alive = true [
+            ; Kill the first guy!
+            set alive false
+            stop
+          ]
+        ]
+        set j j + 1
+        if j = num_players [
+          stop
+        ]
+      ]
+    ]
+  ]
+
+end
+
+to execute-actions-citizen
+end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 819
