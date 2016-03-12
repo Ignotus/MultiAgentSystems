@@ -1,37 +1,66 @@
-globals [time votes]
+; radius: the radius of the players circle
+globals [time votes mafia_color citizen_color radius]
 
 breed [players player]
 
-players-own [alive role belief_roles_mafia belief_roles_citizen belief_danger]
+players-own [alive id role belief_roles_mafia belief_roles_citizen belief_danger intentions desire]
 
 to setup
   clear-all
   setup-variables
   setup-roles
   setup-ticks
+  update-circle
 end
 
-to-report is-morning?
-  report ticks mod 2 = 1
+to-report is-day?
+  report time = "day"
 end
 
 to setup-variables
   set time "day"
+  ask patches [set pcolor white]
+  ; mafia and citizens will have their own color
+  set mafia_color red
+  set citizen_color blue
+  set radius 5 ; can be changed to another value
 end
 
 to setup-roles
   let num_players num-players
   create-players num_players
 
+  let i 0
   ask players [
     set belief_roles_mafia (list)
     set belief_roles_citizen (list)
     set belief_danger (list)
-    set alive true
-  ]
 
-  setup-mafia
+    let l 0
+    ; creating empty believes lists
+    while  [ l < num_players ][
+      set belief_roles_mafia lput 0 belief_roles_mafia
+      set belief_roles_citizen lput 0 belief_roles_citizen
+      set belief_danger lput 0.5 belief_danger
+      set l l + 1
+    ]
+
+    set alive true
+    setxy random-xcor random-ycor
+    set id i
+    set i i + 1
+    ifelse i >= num_mafia
+    [
+      set role "citizen"
+      set color citizen_color
+      ]
+    [
+      set role "mafia"
+      set color mafia_color
+    ]
+  ]
   setup-citizen
+  setup-mafia
 end
 
 to-report num-players
@@ -40,69 +69,27 @@ end
 
 to setup-mafia
   let num_players num-players
-  let i 0
-  loop [
-    ask player i [
-      set role "mafia"
-
+  ; Setting belifs of mafia
+  print count players with [role = "mafia"]
+  ask players with [role = "mafia"][
+      ;place holders to avoid variables overlap
+      let brm belief_roles_mafia
+      let brc belief_roles_citizen
       ; Mafia knows who are mafia and who are citizens
-      let j 0
-      loop [
-        set belief_roles_mafia lput 1 belief_roles_mafia
-        set belief_roles_citizen lput 0 belief_roles_citizen
-        set belief_danger lput 0 belief_danger
-        set j j + 1
-        if j = num_mafia [ stop ]
+      ask players [
+         ifelse role = "mafia"
+         [set brm replace-item id brm 1]
+         [set brc replace-item id brc 1]
       ]
-
-      loop [
-        set belief_roles_mafia lput 0 belief_roles_mafia
-        set belief_roles_citizen lput 1 belief_roles_citizen
-        set belief_danger lput 0.5 belief_danger
-        set j j + 1
-        if j = num_players [ stop ]
-      ]
-    ]
-
-    set i i + 1
-    if i = num_mafia [ stop ]
-  ]
-
+      set belief_roles_mafia brm
+      set belief_roles_citizen brc]
 end
 
 to setup-citizen
-  let num_players num-players
-  let i 0
-  loop [
-    let player_id num_mafia + i
-
-    ask player player_id [
-      set role "citizen"
-
-      let j 0
-      loop [
-        ifelse j = player_id
-        [
-          ; You know exactly that you are not mafia
-          set belief_roles_mafia lput 0 belief_roles_mafia
-          set belief_roles_citizen lput 1 belief_roles_citizen
-          set belief_danger lput 0 belief_danger
-        ]
-        [
-          set belief_roles_mafia lput 0.5 belief_roles_mafia
-          set belief_roles_citizen lput 0.5 belief_roles_citizen
-          set belief_danger lput 0.5 belief_danger
-        ]
-        set j j + 1
-        if j = num_players [ stop ]
-      ]
-    ]
-
-    set i i + 1
-    if i = num_citizen [ stop ]
-  ]
-
   ; Citizens initally only know about themself
+  ask players with [ role = "citizen"][
+    set belief_roles_citizen replace-item id belief_roles_citizen 1
+  ]
 
 end
 
@@ -112,28 +99,44 @@ end
 
 
 to go
-  if is-morning? [
-    set votes (list)
-    let num_players num-players
 
-    let i 0
-    loop [
-      set votes lput 0 votes
-      set i i + 1
-      if i = num_players [ stop ]
-    ]
-  ]
 
+   ; What is this?
+  ;if is-day? [
+  ;  set votes (list)
+  ;  let num_players num-players
+
+   ; let i 0
+;    loop [
+;      set votes lput 0 votes ;?
+;      set i i + 1
+;      if i = num_players [ stop ]
+;    ]
+ ; ]
+  update-time
   update-desires
   update-beliefs
   update-intentions
-  execute-actions
+  ;execute-actions
 
-  if is-morning? [ shoot ]
+
+  ;if is-day? [ shoot ]
 
   tick
+  print("go")
+end
 
-  ifelse is-morning? [ set time "day" ] [set time "night" ]
+; updates the time of the day and
+; sets proper effects, e.g. bg color
+to update-time
+  ifelse not is-day? [
+    set time "day"
+    ask patches [set pcolor white]
+  ]
+  [
+     set time "night"
+     ask patches [set pcolor black]
+  ]
 end
 
 to shoot
@@ -160,9 +163,19 @@ to update-desires
 end
 
 to update-desires-mafia
+  ask players with [ role = "mafia" ][
+    ifelse is-day?
+    [set desire  "hide" ]
+    [set desire "kill citizens" ]
+  ]
 end
 
 to update-desires-citizen
+  ask players with [ role = "citizen" ][
+    ifelse not is-day?
+    [set desire  "sleep" ]
+    [set desire "find mafias" ]
+  ]
 end
 
 to update-beliefs
@@ -196,7 +209,7 @@ end
 to execute-actions-mafia
   let num_players num-players
   ask players with [role = "mafia" and alive = true ] [
-    ifelse is-morning? [
+    ifelse is-day? [
       ; Vote
       let j num_mafia
       loop [
@@ -236,7 +249,7 @@ end
 to execute-actions-citizen
   let num_players num-players
   ask players with [role = "citizen" and alive = true] [
-    if is-morning? [
+    if is-day? [
       ; Vote
       let j 0
       loop [
@@ -256,12 +269,28 @@ to execute-actions-citizen
   ]
 end
 
+; updates the positions of players
+; such that they are standing a circle
+; TODO : NEED TO make sure that turtles look at the center
+to update-circle
+    let i 0
+    let num_alive count players with [alive = true]
+    ask players with [alive = true][
+      let x 0; center of the canvas
+      let y 0
+      let angle (i * 2 * pi / num_alive) * 180 / pi
+      set i i + 1
+      let x_new (x + radius * cos angle)
+      let y_new (y + radius * sin angle)
+      setxy x_new y_new
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-819
-10
-1329
-541
+0
+0
+510
+531
 12
 12
 20.0
@@ -271,13 +300,15 @@ GRAPHICS-WINDOW
 1
 1
 0
-0
-0
+1
+1
 1
 -12
 12
 -12
 12
+0
+0
 1
 1
 1
@@ -285,24 +316,24 @@ ticks
 30.0
 
 SLIDER
+245
 10
-53
-776
-86
+476
+43
 num_mafia
 num_mafia
 1
 10
-2
+6
 1
 1
 NIL
 HORIZONTAL
 
 BUTTON
+8
 10
-10
-153
+82
 43
 NIL
 go
@@ -317,9 +348,9 @@ NIL
 1
 
 BUTTON
-153
+84
 10
-305
+150
 43
 NIL
 go
@@ -334,9 +365,9 @@ NIL
 1
 
 BUTTON
-319
+150
 10
-775
+246
 43
 NIL
 setup
@@ -351,27 +382,104 @@ NIL
 1
 
 SLIDER
+475
 10
-90
-776
-123
+692
+43
 num_citizen
 num_citizen
 1
 10
-6
+3
 1
 1
 NIL
 HORIZONTAL
 
 MONITOR
-309
-235
-421
-280
+697
+10
+809
+55
 NIL
 time
+17
+1
+11
+
+MONITOR
+130
+57
+255
+102
+Believes about mafias
+[belief_roles_mafia] of player 0
+17
+1
+11
+
+MONITOR
+545
+57
+673
+102
+Desire
+[desire] of player 0
+17
+1
+11
+
+MONITOR
+8
+57
+58
+102
+Role
+[role] of player 0
+17
+1
+11
+
+MONITOR
+258
+57
+409
+102
+Believes about citizens
+[belief_roles_citizen] of player 0
+17
+1
+11
+
+MONITOR
+412
+57
+543
+102
+Believes about danger
+[belief_danger] of player 0
+17
+1
+11
+
+MONITOR
+676
+57
+751
+102
+Intentions
+[intentions] of player 0
+17
+1
+11
+
+MONITOR
+78
+56
+128
+101
+id
+[id] of player 0
 17
 1
 11
@@ -750,7 +858,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 5.3
+NetLogo 3D 5.3
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
