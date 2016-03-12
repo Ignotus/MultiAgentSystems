@@ -69,8 +69,7 @@ end
 
 to setup-mafia
   let num_players num-players
-  ; Setting belifs of mafia
-  print count players with [role = "mafia"]
+  ; Setting belives of mafia
   ask players with [role = "mafia"][
       ;place holders to avoid variables overlap
       let brm belief_roles_mafia
