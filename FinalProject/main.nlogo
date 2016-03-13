@@ -24,6 +24,17 @@ to setup-variables
   set mafia_color red
   set citizen_color blue
   set radius 5 ; can be changed to another value
+  reset-votes
+end
+
+to reset-votes
+  let num_players num-players
+  set votes (list)
+  let i 0
+  while [i < num_players] [
+    set votes lput 0 votes
+    set i i + 1
+  ]
 end
 
 to setup-roles
@@ -47,17 +58,15 @@ to setup-roles
 
     set alive true
     setxy random-xcor random-ycor
-    set id i
-    set i i + 1
-    ifelse i >= num_mafia
-    [
-      set role "citizen"
-      set color citizen_color
-      ]
+    ifelse who < num_mafia
     [
       set role "mafia"
       set color mafia_color
+    ] [
+      set role "citizen"
+      set color citizen_color
     ]
+    set i i + 1
   ]
   setup-citizen
   setup-mafia
@@ -77,8 +86,8 @@ to setup-mafia
       ; Mafia knows who are mafia and who are citizens
       ask players [
          ifelse role = "mafia"
-         [set brm replace-item id brm 1]
-         [set brc replace-item id brc 1]
+         [set brm replace-item who brm 1]
+         [set brc replace-item who brc 1]
       ]
       set belief_roles_mafia brm
       set belief_roles_citizen brc]
@@ -87,7 +96,7 @@ end
 to setup-citizen
   ; Citizens initally only know about themself
   ask players with [ role = "citizen"][
-    set belief_roles_citizen replace-item id belief_roles_citizen 1
+    set belief_roles_citizen replace-item who belief_roles_citizen 1
   ]
 
 end
@@ -98,26 +107,16 @@ end
 
 
 to go
-
-
-   ; What is this?
-  ;if is-day? [
-  ;  set votes (list)
-  ;  let num_players num-players
-
-   ; let i 0
-;    loop [
-;      set votes lput 0 votes ;?
-;      set i i + 1
-;      if i = num_players [ stop ]
-;    ]
- ; ]
+  if finished? [stop]
+  reset-votes
   update-time
   update-desires
   update-beliefs
   update-intentions
-  ;execute-actions
+  execute-actions
 
+  shoot
+  update-circle
 
   ;if is-day? [ shoot ]
 
@@ -125,16 +124,19 @@ to go
   print("go")
 end
 
+to-report finished?
+  report (count players with [role = "mafia" and alive] = 0) or (count players with [role = "citizen" and alive] = 0)
+end
+
 ; updates the time of the day and
 ; sets proper effects, e.g. bg color
 to update-time
-  ifelse not is-day? [
+  ifelse is-day? [
+    set time "night"
+    ask patches [set pcolor black]
+  ] [
     set time "day"
     ask patches [set pcolor white]
-  ]
-  [
-     set time "night"
-     ask patches [set pcolor black]
   ]
 end
 
@@ -142,17 +144,18 @@ to shoot
   let max_vote_player 0
   let max_vote item 0 votes
   let i 1
-  loop [
+  while [i < num-players] [
     if max_vote < item i votes [
       set max_vote (item i votes)
       set max_vote_player i
     ]
     set i i + 1
-    if i = num-players [ stop ]
   ]
 
-  ask player max_vote_player [
-    set alive false
+  if max_vote > 0 [
+    ask player max_vote_player [
+      set alive false
+    ]
   ]
 end
 
@@ -171,9 +174,9 @@ end
 
 to update-desires-citizen
   ask players with [ role = "citizen" ][
-    ifelse not is-day?
-    [set desire  "sleep" ]
-    [set desire "find mafias" ]
+    ifelse is-day?
+    [set desire  "find mafias" ]
+    [set desire "sleep" ]
   ]
 end
 
@@ -207,38 +210,28 @@ end
 
 to execute-actions-mafia
   let num_players num-players
-  ask players with [role = "mafia" and alive = true ] [
+  ask players with [role = "mafia" and alive = true] [
     ifelse is-day? [
       ; Vote
-      let j num_mafia
-      loop [
-        ask player j [
-          if alive = true [
-            ; Vote against the first guy!
-            set votes replace-item j votes ((item j votes) + 1)
-            stop
-          ]
+      let j 0
+      let voted false
+      while [j < num_players and not voted] [
+        if (j != who) and ([alive] of player j = true) and ([role] of player j != "mafia") [
+          set votes replace-item j votes ((item j votes) + 1)
+          set voted true
         ]
         set j j + 1
-        if j = num_players [
-          stop
-        ]
       ]
     ] [
       ; Kill citizens
-      let j num_mafia
-      loop [
-        ask player j [
-          if alive = true [
-            ; Kill the first guy!
-            set alive false
-            stop
-          ]
+      let j 0
+      let voted false
+      while [j < num_players and not voted] [
+        if (j != who) and ([alive] of player j = true) and ([role] of player j != "mafia") [
+          set votes replace-item j votes ((item j votes) + 1)
+          set voted true
         ]
         set j j + 1
-        if j = num_players [
-          stop
-        ]
       ]
     ]
   ]
@@ -251,18 +244,13 @@ to execute-actions-citizen
     if is-day? [
       ; Vote
       let j 0
-      loop [
-        ask player j [
-          if alive = true [
-            ; Vote against the first guy!
-            set votes replace-item j votes ((item j votes) + 1)
-            stop
-          ]
+      let voted false
+      while [j < num_players and not voted] [
+        if (j != who) and ([alive] of player j = true) [
+          set votes replace-item j votes ((item j votes) + 1)
+          set voted true
         ]
         set j j + 1
-        if j = num_players [
-          stop
-        ]
       ]
     ]
   ]
@@ -272,24 +260,29 @@ end
 ; such that they are standing a circle
 ; TODO : NEED TO make sure that turtles look at the center
 to update-circle
-    let i 0
-    let num_alive count players with [alive = true]
-    ask players with [alive = true][
-      let x 0; center of the canvas
-      let y 0
-      let angle (i * 2 * pi / num_alive) * 180 / pi
-      set i i + 1
-      let x_new (x + radius * cos angle)
-      let y_new (y + radius * sin angle)
-      setxy x_new y_new
+  let num_alive count players with [alive = true]
+  ask players with [alive = false] [
+    hide-turtle
+  ]
+  let i 0
+  ask players with [alive = true][
+    let x 0 ; center of the canvas
+    let y 0
+    let angle (i * 2 * pi / num_alive) * 180 / pi
+    let x_new (x + radius * cos angle)
+    let y_new (y + radius * sin angle)
+    setxy x_new y_new
+    facexy x y
+    show-turtle
+    set i i + 1
   ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-0
-0
-510
-531
+8
+115
+518
+646
 12
 12
 20.0
@@ -310,9 +303,7 @@ GRAPHICS-WINDOW
 0
 1
 1
-1
-ticks
-30.0
+1.0
 
 SLIDER
 245
@@ -323,7 +314,7 @@ num_mafia
 num_mafia
 1
 10
-6
+3
 1
 1
 NIL
@@ -389,7 +380,7 @@ num_citizen
 num_citizen
 1
 10
-3
+5
 1
 1
 NIL
@@ -857,7 +848,7 @@ Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 
 @#$#@#$#@
-NetLogo 3D 5.3
+NetLogo 5.3
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
