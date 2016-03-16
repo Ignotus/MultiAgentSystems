@@ -1,9 +1,11 @@
 ; radius: the radius of the players circle
-globals [time votes mafia_color citizen_color radius]
+globals [time votes mafia_color citizen_color radius personalities opinions]
 
 breed [players player]
 
-players-own [alive role belief_roles_mafia belief_roles_citizen belief_danger intentions desire]
+; personality: corresponds to the personality type of player (naive, vengeful, logician)
+; belief_social: how much player is influenced by believes of other players after the communication step
+players-own [alive role belief_roles_mafia belief_roles_citizen belief_danger belief_social intentions desire personality]
 
 to setup
   clear-all
@@ -24,6 +26,8 @@ to setup-variables
   set mafia_color red
   set citizen_color blue
   set radius 5 ; can be changed to another value
+  set personalities ["naive" "vengeful" "logician"]
+  set opinions create-empty-list num-players -1
   reset-votes
 end
 
@@ -46,11 +50,11 @@ to setup-roles
     set belief_roles_mafia (create-empty-list num_players 0)
     set belief_roles_citizen (create-empty-list num_players 0)
     set belief_danger (create-empty-list num_players 0.5)
-
-
-
+    set belief_social (create-empty-list num_players 0)
     set alive true
     setxy random-xcor random-ycor
+    ; setting personality of a player at this stage randomly
+    set personality one-of personalities
     ifelse who < num_mafia
     [
       set role "mafia"
@@ -112,17 +116,14 @@ to go
   update-desires
   update-beliefs
   update-intentions
-
   ;execute-actions ; I've rewrites the voting procedure to make it more general
-  start-voting
+  exchange-opinions
+  start-voting ; start the voting procedure
   eliminate-player ; eliminate a player who received most votes against
 
   update-circle
-
   ;if is-day? [ shoot ]
-
   tick
-  print("go")
 end
 
 to-report finished?
@@ -216,22 +217,102 @@ end
 ; the subsequent function has to eliminate a player who got most votes against
 ; works both for mafia (night) and all (day) voting
 to start-voting
+  ; I assume that voting is a list with all zeros at this stage
   ifelse is-day?
   [ ; all players are voting
     ask players with [alive = true][
-
+      let id vote ; the id of the player who player who wants to eliminate
+      set votes replace-item id votes ((item id votes) + 1)
     ]
-
   ]
-  [
+  [ ; only mafia votes
+    ask players with [alive = true and role = "mafia"][
+      let id vote ; the id of the player who player who wants to eliminate
+      set votes replace-item id votes ((item id votes) + 1)
     ]
+   ]
 end
 
 
 ; a function that outputs the id of a player who a player with [id] wants to eliminate most
-to vote [id]
+; will involve a player type based heuristic
+; at the current moment it's outputs a random id
+to-report vote
+ let against -1 ; against whom a player wants to vote most
+ let max_prob -1
+ let weights (get-weights personality (role = "mafia")) ; a.k.a significance (lambdas)
+ let i 0
+ while [i < num-players and ([alive] of player i = true)]
+ [
+   let mafia ((item i belief_roles_mafia) * (item 0 weights))
+   let danger ((item i belief_danger) * (item 1 weights))
+   let social ((item i belief_social) * (item 2 weights))
 
+   ; consider all factors and update the current target for elimination
+   if (mafia + danger + social) > max_prob
+   [set against i]
+   set i i + 1
+ ]
+ report against
 end
+
+
+
+; returns a length of 3 weights list associated with a player type
+; weights meaning:
+;    1st: significance of mafia/citizen believes
+;    2nd: significance of danger
+;    3rd: significance of social influence
+; note that weights for mafia are different
+to-report get-weights [pers mafia?]
+  let weights []
+
+  ; if player is naive
+  if pers = item 0 personalities
+  [
+    ifelse mafia?
+    [set weights [0 0.5 0.5]]
+    [set weights (create-empty-list 3 0.3333 )]
+  ]
+
+  ; if player is vengeful
+  if pers = item 1 personalities
+  [
+    ifelse mafia?
+    [set weights [0 0.7 0.3]]
+    [set weights [0.2 0.6 0.2]]
+  ]
+
+  ; if logician (Tick for Tac)
+  if pers = item 2 personalities
+  [
+    ifelse mafia?
+    [set weights [0 0.65 0.35]]
+    [set weights [0.5 0.4 0.1]]
+  ]
+
+  report weights
+end
+
+; set a vector of opinions
+; -1 indicates that a player has not provided his opinion about who is mafia
+to exchange-opinions
+  set opinions (create-empty-list num-players -1)
+  ask players with [alive = true]
+  [
+    set opinions replace-item who get-opinion opinions
+  ]
+end
+
+; returns an id of a player who the current player suspect to be mafia
+to-report get-opinion
+  let id -1
+  ifelse role = "mafia"
+  [set id (num_mafia + random num_citizen)]
+  [set id (get-max-index belief_roles_mafia)]
+  report id
+end
+
 
 to execute-actions-mafia
   let num_players num-players
@@ -303,6 +384,8 @@ to update-circle
   ]
 end
 
+
+;------------ SUPPORT FUNCTIONS -----------
 ; creates an empty list of length n with all values i
 to-report create-empty-list [n i]
     let l 0
@@ -314,12 +397,23 @@ to-report create-empty-list [n i]
     report myList
 end
 
+; returns the index of a maximum element from the list A
+to-report get-max-index [A]
+  let max_val -99999999
+  let max_index -1
+  let i 0
+  foreach A [ if max_val < ?
+    [set max_index i]
+    set i i + 1
+  ]
+  report i
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-824
-10
-1370
-577
+1024
+12
+1570
+579
 12
 12
 21.44
@@ -351,7 +445,7 @@ num_mafia
 num_mafia
 1
 10
-7
+3
 1
 1
 NIL
@@ -417,7 +511,7 @@ num_citizen
 num_citizen
 1
 10
-7
+4
 1
 1
 NIL
@@ -435,10 +529,10 @@ time
 11
 
 MONITOR
-130
-57
-279
-102
+187
+59
+416
+104
 Believes about mafias
 [belief_roles_mafia] of player 0
 17
@@ -468,18 +562,7 @@ Role
 11
 
 MONITOR
-280
-58
-470
-103
-Believes about citizens
-[belief_roles_citizen] of player 0
-17
-1
-11
-
-MONITOR
-470
+420
 59
 667
 104
@@ -501,10 +584,10 @@ Intention
 11
 
 MONITOR
-78
-56
-128
-101
+63
+58
+113
+103
 id
 [who] of player 0
 17
@@ -523,9 +606,9 @@ Role
 11
 
 MONITOR
-76
+62
 106
-128
+114
 151
 id
 [who] of player 1
@@ -534,9 +617,9 @@ id
 11
 
 MONITOR
-130
+186
 107
-280
+416
 152
 Believes about mafia
 [belief_roles_mafia] of player 1
@@ -545,18 +628,7 @@ Believes about mafia
 11
 
 MONITOR
-280
-107
-470
-152
-Believes about citizens
-[belief_roles_citizen] of player 1
-17
-1
-11
-
-MONITOR
-470
+419
 107
 666
 152
@@ -600,9 +672,9 @@ Role
 11
 
 MONITOR
-76
+62
 156
-126
+112
 201
 id
 [who] of player num_mafia
@@ -611,10 +683,10 @@ id
 11
 
 MONITOR
-131
-156
-280
-201
+186
+155
+416
+200
 Belives about mafia
 [belief_roles_mafia] of player num_mafia
 17
@@ -622,18 +694,7 @@ Belives about mafia
 11
 
 MONITOR
-281
-155
-469
-200
-Believes about citizens
-[belief_roles_citizen] of player num_mafia
-17
-1
-11
-
-MONITOR
-471
+419
 155
 667
 200
@@ -677,9 +738,9 @@ Role
 11
 
 MONITOR
-77
+63
 202
-127
+113
 247
 id
 [who] of player (num_mafia + 1)
@@ -688,10 +749,10 @@ id
 11
 
 MONITOR
-132
-203
-281
-248
+187
+202
+417
+247
 Believes about mafia
 [belief_roles_mafia] of player (num_mafia + 1)
 17
@@ -699,18 +760,7 @@ Believes about mafia
 11
 
 MONITOR
-281
-203
-469
-248
-Believes about citizens
-[belief_roles_citizen] of player (num_mafia + 1)
-17
-1
-11
-
-MONITOR
-472
+420
 203
 665
 248
@@ -743,12 +793,67 @@ Intention
 11
 
 MONITOR
-991
-35
-1207
-80
+1189
+38
+1405
+83
 Votes
 votes
+17
+1
+11
+
+MONITOR
+115
+59
+185
+104
+Personality
+[personality] of player 0
+17
+1
+11
+
+MONITOR
+115
+105
+184
+150
+Personality
+[personality] of player 1
+17
+1
+11
+
+MONITOR
+115
+155
+185
+200
+Personality
+[personality] of player num_mafia
+17
+1
+11
+
+MONITOR
+117
+200
+186
+245
+Personality
+[personality] of player (num_mafia + 1)
+17
+1
+11
+
+MONITOR
+1189
+88
+1406
+134
+Opinions
+opinions
 17
 1
 11
