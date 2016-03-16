@@ -95,10 +95,22 @@ end
 
 to setup-citizen
   ; Citizens initally only know about themself
-  ask players with [ role = "citizen"][
-    set belief_roles_citizen replace-item who belief_roles_citizen 1
+  ; and they will think that other players
+  ; can be equally mafia and citizans
+  let believes []
+  let l 0
+  ; creating empty believes lists
+  while  [ l < num_players ][
+    set believes lput 0.5 believes
+    set l l + 1
   ]
-
+  ask players with [ role = "citizen"][
+    set belief_roles_citizen believes
+    set belief_roles_mafia believes
+    ; now we set the current player's belives about himself
+    set belief_roles_citizen replace-item who belief_roles_citizen 1
+    set belief_roles_mafia replace-item who belief_roles_mafia 0
+  ]
 end
 
 to setup-ticks
