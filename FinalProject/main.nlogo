@@ -3,7 +3,7 @@ globals [time votes mafia_color citizen_color radius]
 
 breed [players player]
 
-players-own [alive id role belief_roles_mafia belief_roles_citizen belief_danger intentions desire]
+players-own [alive role belief_roles_mafia belief_roles_citizen belief_danger intentions desire]
 
 to setup
   clear-all
@@ -43,18 +43,11 @@ to setup-roles
 
   let i 0
   ask players [
-    set belief_roles_mafia (list)
-    set belief_roles_citizen (list)
-    set belief_danger (list)
+    set belief_roles_mafia (create-empty-list num_players 0)
+    set belief_roles_citizen (create-empty-list num_players 0)
+    set belief_danger (create-empty-list num_players 0.5)
 
-    let l 0
-    ; creating empty believes lists
-    while  [ l < num_players ][
-      set belief_roles_mafia lput 0 belief_roles_mafia
-      set belief_roles_citizen lput 0 belief_roles_citizen
-      set belief_danger lput 0.5 belief_danger
-      set l l + 1
-    ]
+
 
     set alive true
     setxy random-xcor random-ycor
@@ -97,13 +90,7 @@ to setup-citizen
   ; Citizens initally only know about themself
   ; and they will think that other players
   ; can be equally mafia and citizans
-  let believes []
-  let l 0
-  ; creating empty believes lists
-  while  [ l < num_players ][
-    set believes lput 0.5 believes
-    set l l + 1
-  ]
+  let believes (create-empty-list num-players 0.5)
   ask players with [ role = "citizen"][
     set belief_roles_citizen believes
     set belief_roles_mafia believes
@@ -125,9 +112,11 @@ to go
   update-desires
   update-beliefs
   update-intentions
-  execute-actions
 
-  shoot
+  ;execute-actions ; I've rewrites the voting procedure to make it more general
+  start-voting
+  eliminate-player ; eliminate a player who received most votes against
+
   update-circle
 
   ;if is-day? [ shoot ]
@@ -152,7 +141,9 @@ to update-time
   ]
 end
 
-to shoot
+; the function eliminates the player who received majority of votes against
+; TODO: if votes are equal then random selection is performed
+to eliminate-player
   let max_vote_player 0
   let max_vote item 0 votes
   let i 1
@@ -218,6 +209,28 @@ end
 to execute-actions
   execute-actions-mafia
   execute-actions-citizen
+end
+
+
+; a general voting function that stores votes into a global variable
+; the subsequent function has to eliminate a player who got most votes against
+; works both for mafia (night) and all (day) voting
+to start-voting
+  ifelse is-day?
+  [ ; all players are voting
+    ask players with [alive = true][
+
+    ]
+
+  ]
+  [
+    ]
+end
+
+
+; a function that outputs the id of a player who a player with [id] wants to eliminate most
+to vote [id]
+
 end
 
 to execute-actions-mafia
@@ -289,15 +302,27 @@ to update-circle
     set i i + 1
   ]
 end
+
+; creates an empty list of length n with all values i
+to-report create-empty-list [n i]
+    let l 0
+    let myList []
+    while  [ l < n ][
+      set myList lput i myList
+      set l l + 1
+    ]
+    report myList
+end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
-8
-115
-518
-646
+824
+10
+1370
+577
 12
 12
-20.0
+21.44
 1
 10
 1
@@ -326,7 +351,7 @@ num_mafia
 num_mafia
 1
 10
-3
+7
 1
 1
 NIL
@@ -392,7 +417,7 @@ num_citizen
 num_citizen
 1
 10
-5
+7
 1
 1
 NIL
@@ -412,7 +437,7 @@ time
 MONITOR
 130
 57
-255
+279
 102
 Believes about mafias
 [belief_roles_mafia] of player 0
@@ -421,10 +446,10 @@ Believes about mafias
 11
 
 MONITOR
-545
-57
-673
-102
+667
+59
+748
+104
 Desire
 [desire] of player 0
 17
@@ -443,10 +468,10 @@ Role
 11
 
 MONITOR
-258
-57
-409
-102
+280
+58
+470
+103
 Believes about citizens
 [belief_roles_citizen] of player 0
 17
@@ -454,10 +479,10 @@ Believes about citizens
 11
 
 MONITOR
-412
-57
-543
-102
+470
+59
+667
+104
 Believes about danger
 [belief_danger] of player 0
 17
@@ -465,11 +490,11 @@ Believes about danger
 11
 
 MONITOR
-676
-57
-751
-102
-Intentions
+749
+59
+818
+104
+Intention
 [intentions] of player 0
 17
 1
@@ -481,7 +506,249 @@ MONITOR
 128
 101
 id
-[id] of player 0
+[who] of player 0
+17
+1
+11
+
+MONITOR
+7
+105
+58
+150
+Role
+[role] of player 1
+17
+1
+11
+
+MONITOR
+76
+106
+128
+151
+id
+[who] of player 1
+17
+1
+11
+
+MONITOR
+130
+107
+280
+152
+Believes about mafia
+[belief_roles_mafia] of player 1
+17
+1
+11
+
+MONITOR
+280
+107
+470
+152
+Believes about citizens
+[belief_roles_citizen] of player 1
+17
+1
+11
+
+MONITOR
+470
+107
+666
+152
+Believes about danger
+[belief_danger] of player 1
+17
+1
+11
+
+MONITOR
+666
+106
+749
+151
+Desire
+[desire] of player 1
+17
+1
+11
+
+MONITOR
+750
+106
+816
+151
+Intention
+[intentions] of player 1
+17
+1
+11
+
+MONITOR
+6
+154
+58
+199
+Role
+[role] of player num_mafia
+17
+1
+11
+
+MONITOR
+76
+156
+126
+201
+id
+[who] of player num_mafia
+17
+1
+11
+
+MONITOR
+131
+156
+280
+201
+Belives about mafia
+[belief_roles_mafia] of player num_mafia
+17
+1
+11
+
+MONITOR
+281
+155
+469
+200
+Believes about citizens
+[belief_roles_citizen] of player num_mafia
+17
+1
+11
+
+MONITOR
+471
+155
+667
+200
+Believes about danger
+[belief_danger] of player num_mafia
+17
+1
+11
+
+MONITOR
+667
+155
+748
+200
+Desire
+[desire] of player num_mafia
+17
+1
+11
+
+MONITOR
+750
+154
+815
+199
+Intention
+[intentions] of player num_mafia
+17
+1
+11
+
+MONITOR
+6
+202
+57
+247
+Role
+[role] of player (num_mafia + 1)
+17
+1
+11
+
+MONITOR
+77
+202
+127
+247
+id
+[who] of player (num_mafia + 1)
+17
+1
+11
+
+MONITOR
+132
+203
+281
+248
+Believes about mafia
+[belief_roles_mafia] of player (num_mafia + 1)
+17
+1
+11
+
+MONITOR
+281
+203
+469
+248
+Believes about citizens
+[belief_roles_citizen] of player (num_mafia + 1)
+17
+1
+11
+
+MONITOR
+472
+203
+665
+248
+Believes about danger
+[belief_danger] of player (num_mafia + 1 )
+17
+1
+11
+
+MONITOR
+668
+204
+748
+249
+Desire
+[desire] of player (num_mafia + 1)
+17
+1
+11
+
+MONITOR
+751
+204
+816
+249
+Intention
+[intentions] of player (num_mafia + 1)
+17
+1
+11
+
+MONITOR
+991
+35
+1207
+80
+Votes
+votes
 17
 1
 11
