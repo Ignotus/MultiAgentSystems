@@ -57,7 +57,7 @@ to setup-roles
     set belief_social (create-empty-list num_players 0)
     set alive true
     set shape "person"
-    set label i
+    set label who
     set time get-time
     setxy random-xcor random-ycor
     ; setting personality of a player at this stage randomly
@@ -302,15 +302,19 @@ end
 to vote
   ; I assume that voting is a list with all zeros at this stage
   reset-votes
+  print votes
   if time = "vote" [ ; all players are voting
     ask players with [alive = true] [
       let id personal-vote ; the id of the player who player wants to eliminate
+      print (list "player" who "votes against" id)
       set votes replace-item id votes ((item id votes) + 1)
     ]
   ]
   if time = "m-vote" [ ; only mafia votes
+    print "m-vote"
     ask players with [alive = true and role = "mafia"][
       let id personal-vote ; the id of the player who player wants to eliminate
+      print (list "player" who "wants to kill" id)
       set votes replace-item id votes ((item id votes) + 1)
     ]
   ]
@@ -339,6 +343,7 @@ to-report personal-vote
    ]
    set i i + 1
  ]
+ print (list "max prob" max_prob)
  report against
 end
 
@@ -404,6 +409,7 @@ end
 
 to execute-actions-mafia
   let num_players num-players
+  print "execute-action-mafia"
   ask players with [role = "mafia" and alive = true] [
     ifelse is-day? [
       ; Vote
@@ -423,6 +429,7 @@ to execute-actions-mafia
       while [j < num_players and not voted] [
         if (j != who) and ([alive] of player j = true) and ([role] of player j != "mafia") [
           set votes replace-item j votes ((item j votes) + 1)
+          print j
           set voted true
         ]
         set j j + 1
