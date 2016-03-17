@@ -162,6 +162,27 @@ to update-beliefs-mafia
   ask players with [alive and role = "mafia"] [
     if (time = "sleep") or (time = "awake") or (time = "vote") [
       ; TODO: Update danger for mafia
+      let prev_votes ([prev_vote] of players)
+
+      let num_players num-players
+      let i 0
+      while [i < num_players] [
+        ifelse not ([alive] of player i) [
+          ; if died then not dangerous
+          set belief_danger (replace-item i belief_danger 0)
+        ] [
+          ; if previously voted against mafia
+          let player_prev_vote (item i prev_votes)
+          if player_prev_vote != -1 [
+            ifelse (([role] of player player_prev_vote) = "mafia") [
+              set belief_danger (replace-item i belief_danger (((item i belief_danger) + 1.0) / 2))
+            ] [
+              set belief_danger (replace-item i belief_danger (0.75 * (item i belief_danger)))
+            ]
+          ]
+        ]
+        set i i + 1
+      ]
     ]
   ]
 end
@@ -175,6 +196,7 @@ to update-beliefs-citizen
       ; TODO: Update beliefs of citizens
 
       let prev_votes ([prev_vote] of players)
+      ; anonimize roles, because citizens should not know who are citizens
       let roles ([ifelse-value alive [-1] [[role] of player who]] of players)
 
       let num_players num-players
@@ -190,7 +212,7 @@ to update-beliefs-citizen
             ifelse (([role] of player player_prev_vote) = "citizen") [
               set belief_danger (replace-item i belief_danger (((item i belief_danger) + 1.0) / 2))
             ] [
-              set belief_danger (replace-item i belief_danger ((3 * (item i belief_danger) - 1.0) / 2))
+              set belief_danger (replace-item i belief_danger (0.75 * (item i belief_danger)))
             ]
           ]
         ]
