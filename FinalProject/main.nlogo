@@ -133,7 +133,7 @@ end
 to-report finished?
   let alive_mafia_count count players with [role = "mafia" and alive]
   let alive_citizens_count count players with [role = "citizen" and alive]
-  report (alive_mafia_count = 0) or  (alive_mafia_count >= alive_citizens_count)
+  report (alive_mafia_count = 0) or  (alive_citizens_count = 0)
 end
 
 ; updates the time of the day and
@@ -539,7 +539,7 @@ num_mafia
 num_mafia
 1
 10
-3
+5
 1
 1
 NIL
@@ -605,7 +605,7 @@ num_citizen
 num_citizen
 1
 10
-8
+4
 1
 1
 NIL
