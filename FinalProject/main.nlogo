@@ -57,6 +57,7 @@ to setup-roles
     set belief_social (create-empty-list num_players 0)
     set alive true
     set shape "person"
+    set label i
     set time get-time
     setxy random-xcor random-ycor
     ; setting personality of a player at this stage randomly
@@ -451,7 +452,6 @@ end
 
 ; updates the positions of players
 ; such that they are standing a circle
-; TODO : NEED TO make sure that turtles look at the center
 to render-environment
   let num_players num-players
   ask players with [alive = false] [
