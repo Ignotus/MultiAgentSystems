@@ -333,6 +333,7 @@ to-report personal-vote
      let mafia ((item i belief_roles_mafia) * (item 0 weights))
      let danger ((item i belief_danger) * (item 1 weights))
      let social ((item i belief_social) * (item 2 weights))
+     ; print (list "player" who "prob" mafia danger social)
      let prob (mafia + danger + social)
 
      ; consider all factors and update the current target for elimination
@@ -340,10 +341,14 @@ to-report personal-vote
        set against i
        set max_prob prob
      ]
+     ; this randomity for not to choose the first guy with the particular probability every time
+     if (prob = max_prob) and (random 2 = 1) [
+       set against i
+     ]
    ]
    set i i + 1
  ]
- print (list "max prob" max_prob)
+ ; print (list "max prob" max_prob)
  report against
 end
 
@@ -429,7 +434,7 @@ to execute-actions-mafia
       while [j < num_players and not voted] [
         if (j != who) and ([alive] of player j = true) and ([role] of player j != "mafia") [
           set votes replace-item j votes ((item j votes) + 1)
-          print j
+          ; print j
           set voted true
         ]
         set j j + 1
@@ -539,7 +544,7 @@ num_mafia
 num_mafia
 1
 10
-5
+3
 1
 1
 NIL
@@ -605,7 +610,7 @@ num_citizen
 num_citizen
 1
 10
-4
+6
 1
 1
 NIL
