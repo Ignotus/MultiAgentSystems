@@ -300,7 +300,7 @@ to exchange-opinions
   set opinions (create-empty-list num-players -1)
   ask players with [alive = true]
   [
-    set opinions replace-item who get-opinion opinions
+    set opinions replace-item who opinions get-opinion
   ]
 end
 
@@ -851,7 +851,7 @@ MONITOR
 1189
 88
 1406
-134
+133
 Opinions
 opinions
 17
