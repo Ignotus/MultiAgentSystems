@@ -127,7 +127,9 @@ to go
 end
 
 to-report finished?
-  report (count players with [role = "mafia" and alive] = 0) or (count players with [role = "citizen" and alive] = 0)
+  let alive_mafia_count count players with [role = "mafia" and alive]
+  let alive_citizens_count count players with [role = "citizen" and alive]
+  report (alive_mafia_count = 0) or  (alive_mafia_count >= alive_citizens_count)
 end
 
 ; updates the time of the day and
