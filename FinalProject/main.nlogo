@@ -5,7 +5,7 @@ breed [players player]
 
 ; personality: corresponds to the personality type of player (naive, vengeful, logician)
 ; belief_social: how much player is influenced by believes of other players after the communication step
-players-own [alive role time belief_roles_mafia belief_roles_citizen belief_danger belief_social desire intentions action personality]
+players-own [alive role time belief_roles_mafia belief_roles_citizen belief_danger belief_social desire intentions action personality prev_vote]
 
 to setup
   clear-all
@@ -59,6 +59,7 @@ to setup-roles
     set shape "person"
     set label who
     set time get-time
+    set prev_vote -1
     setxy random-xcor random-ycor
     ; setting personality of a player at this stage randomly
     set personality one-of personalities
@@ -172,6 +173,29 @@ to update-beliefs-citizen
   ask players with [alive and role = "citizen"] [
     if (time = "awake") or (time = "vote") [
       ; TODO: Update beliefs of citizens
+
+      let prev_votes ([prev_vote] of players)
+      let roles ([ifelse-value alive [-1] [[role] of player who]] of players)
+
+      let num_players num-players
+      let i 0
+      while [i < num_players] [
+        ifelse not ([alive] of player i) [
+          ; if died then not dangerous
+          set belief_danger (replace-item i belief_danger 0)
+        ] [
+          ; if previously voted wrongly
+          let player_prev_vote (item i prev_votes)
+          if player_prev_vote != -1 [
+            ifelse (([role] of player player_prev_vote) = "citizen") [
+              set belief_danger (replace-item i belief_danger (((item i belief_danger) + 1.0) / 2))
+            ] [
+              set belief_danger (replace-item i belief_danger ((3 * (item i belief_danger) - 1.0) / 2))
+            ]
+          ]
+        ]
+        set i i + 1
+      ]
     ]
   ]
 end
@@ -314,6 +338,7 @@ to vote
     let id personal-vote ; the id of the player who player wants to eliminate
     print (list "player" who "votes against" id)
     set votes replace-item id votes ((item id votes) + 1)
+    set prev_vote id
   ]
   ; only mafia votes
   ask players with [time = "m-vote" and alive = true and role = "mafia"][
@@ -547,7 +572,7 @@ num_mafia
 num_mafia
 1
 10
-3
+2
 1
 1
 NIL
@@ -613,7 +638,7 @@ num_citizen
 num_citizen
 1
 10
-6
+10
 1
 1
 NIL
