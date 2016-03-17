@@ -52,6 +52,7 @@ to setup-roles
     set belief_danger (create-empty-list num_players 0.5)
     set belief_social (create-empty-list num_players 0)
     set alive true
+    set shape "person"
     setxy random-xcor random-ycor
     ; setting personality of a player at this stage randomly
     set personality one-of personalities
@@ -368,21 +369,18 @@ end
 ; such that they are standing a circle
 ; TODO : NEED TO make sure that turtles look at the center
 to update-circle
-  let num_alive count players with [alive = true]
+  let num_players num-players
   ask players with [alive = false] [
-    hide-turtle
+    set shape "x"
   ]
-  let i 0
-  ask players with [alive = true][
+  ask players [
     let x 0 ; center of the canvas
     let y 0
-    let angle (i * 2 * pi / num_alive) * 180 / pi
+    let angle (who * 2 * pi / num_alive) * 180 / pi
     let x_new (x + radius * cos angle)
     let y_new (y + radius * sin angle)
     setxy x_new y_new
     facexy x y
-    show-turtle
-    set i i + 1
   ]
 end
 
