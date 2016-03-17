@@ -254,25 +254,31 @@ to update-intentions-citizen
 end
 
 to execute-actions
+  let to_exchange_opinion false
+  let to_vote false
+  let to_eliminate false
   ask players with [alive] [
     if (intentions = "sleep") or (intentions = "pretend to sleep") or
        (intentions = "wake up") or (intentions = "pretend to wake up") [
          set action intentions
     ]
     if (intentions = "exchange opinions") [
-      exchange-opinions
+      set to_exchange_opinion true
       set action "exchange opinions"
     ]
     if (intentions = "vote") [
-      vote ; start the voting procedure
+      set to_vote true
       set action intentions
     ]
     if (intentions = "kill") or (intentions = "eliminate") [
-      eliminate-player ; eliminate a player who received most votes against
+      set to_eliminate true
       set action intentions
     ]
   ]
 
+  if to_exchange_opinion [ exchange-opinions ]
+  if to_vote [ vote ]
+  if to_eliminate [ eliminate-player ]
   ; execute-actions-mafia
   ; execute-actions-citizen
 end
@@ -303,20 +309,17 @@ to vote
   ; I assume that voting is a list with all zeros at this stage
   reset-votes
   print votes
-  if time = "vote" [ ; all players are voting
-    ask players with [alive = true] [
-      let id personal-vote ; the id of the player who player wants to eliminate
-      print (list "player" who "votes against" id)
-      set votes replace-item id votes ((item id votes) + 1)
-    ]
+  ; all players are voting
+  ask players with [alive = true and time = "vote"] [
+    let id personal-vote ; the id of the player who player wants to eliminate
+    print (list "player" who "votes against" id)
+    set votes replace-item id votes ((item id votes) + 1)
   ]
-  if time = "m-vote" [ ; only mafia votes
-    print "m-vote"
-    ask players with [alive = true and role = "mafia"][
-      let id personal-vote ; the id of the player who player wants to eliminate
-      print (list "player" who "wants to kill" id)
-      set votes replace-item id votes ((item id votes) + 1)
-    ]
+  ; only mafia votes
+  ask players with [time = "m-vote" and alive = true and role = "mafia"][
+    let id personal-vote ; the id of the player who player wants to eliminate
+    print (list "player" who "wants to kill" id)
+    set votes replace-item id votes ((item id votes) + 1)
   ]
 end
 
