@@ -1,26 +1,26 @@
 ; radius: the radius of the players circle
-globals [time votes mafia_color citizen_color radius personalities opinions]
+globals [rounds votes mafia_color citizen_color radius personalities opinions]
 
 breed [players player]
 
 ; personality: corresponds to the personality type of player (naive, vengeful, logician)
 ; belief_social: how much player is influenced by believes of other players after the communication step
-players-own [alive role belief_roles_mafia belief_roles_citizen belief_danger belief_social intentions desire personality]
+players-own [alive role time belief_roles_mafia belief_roles_citizen belief_danger belief_social desire intentions action personality]
 
 to setup
   clear-all
+  setup-ticks
   setup-variables
   setup-roles
-  setup-ticks
-  update-circle
+  render-environment
 end
 
 to-report is-day?
-  report time = "day"
+  report ticks mod (length rounds) > 2
 end
 
 to setup-variables
-  set time "day"
+  set rounds ["sleep" "m-vote" "kill" "awake" "discuss" "vote" "eliminate"]
   ask patches [set pcolor white]
   ; mafia and citizens will have their own color
   set mafia_color red
@@ -29,6 +29,10 @@ to setup-variables
   set personalities ["naive" "vengeful" "logician"]
   set opinions create-empty-list num-players -1
   reset-votes
+end
+
+to-report get-time
+  report item (ticks mod (length rounds)) rounds
 end
 
 to reset-votes
@@ -53,6 +57,7 @@ to setup-roles
     set belief_social (create-empty-list num_players 0)
     set alive true
     set shape "person"
+    set time get-time
     setxy random-xcor random-ycor
     ; setting personality of a player at this stage randomly
     set personality one-of personalities
@@ -112,17 +117,14 @@ end
 
 to go
   if finished? [stop]
-  reset-votes
   update-time
-  update-desires
   update-beliefs
+  update-desires
   update-intentions
-  ;execute-actions ; I've rewrites the voting procedure to make it more general
-  exchange-opinions
-  start-voting ; start the voting procedure
-  eliminate-player ; eliminate a player who received most votes against
 
-  update-circle
+  execute-actions
+
+  render-environment
   ;if is-day? [ shoot ]
   tick
 end
@@ -137,12 +139,206 @@ end
 ; sets proper effects, e.g. bg color
 to update-time
   ifelse is-day? [
-    set time "night"
-    ask patches [set pcolor black]
-  ] [
-    set time "day"
     ask patches [set pcolor white]
+  ] [
+    ask patches [set pcolor black]
   ]
+end
+
+to update-beliefs
+  ; Perceive from environment, which round it is and set it as a belief
+  ask players [ set time get-time ]
+
+  update-beliefs-mafia
+  update-beliefs-citizen
+end
+
+to update-beliefs-mafia
+  ; Logically, beliefs should be updated at all times, but the function itself
+  ; should actually introduce changes only when there is something to change
+  ; i.e. There should be no need for this if statement
+  ask players with [alive and role = "mafia"] [
+    if (time = "sleep") or (time = "awake") or (time = "vote") [
+      ; TODO: Update danger for mafia
+    ]
+  ]
+end
+
+to update-beliefs-citizen
+  ; Logically, beliefs should be updated at all times, but the function itself
+  ; should actually introduce changes only when there is something to change
+  ; i.e. There should be no need for this if statement
+  ask players with [alive and role = "citizen"] [
+    if (time = "awake") or (time = "vote") [
+      ; TODO: Update beliefs of citizens
+    ]
+  ]
+end
+
+to update-desires
+  update-desires-mafia
+  update-desires-citizen
+end
+
+to update-desires-mafia
+  ask players with [ alive and role = "mafia" ] [
+    ifelse is-day?
+    [set desire  "hide" ]
+    [set desire "kill citizens" ]
+  ]
+end
+
+to update-desires-citizen
+  ask players with [ alive and role = "citizen" ] [
+    ifelse is-day?
+    [set desire  "find mafia" ]
+    [set desire "sleep" ]
+  ]
+end
+
+to update-intentions
+  update-intentions-mafia
+  update-intentions-citizen
+end
+
+to update-intentions-mafia
+  ; time is a belief
+  ; TODO: needs to be refined
+  ask players with [alive and role = "mafia"] [
+    let intention ""
+    if time = "sleep" [
+      set intention "pretend to sleep"
+    ]
+    if time = "m-vote" [
+      set intention "vote"
+    ]
+    if time = "kill" [
+      set intention "kill"
+    ]
+    if time = "awake" [
+      set intention "pretend to wake up"
+    ]
+    if time = "discuss" [
+      set intention "exchange opinions"
+    ]
+    if time = "vote" [
+      set intention "vote"
+    ]
+    if time = "eliminate" [
+      set intention "eliminate"
+    ]
+    set intentions intention
+  ]
+end
+
+to update-intentions-citizen
+  ; time is a belief
+  ; TODO: needs to be refined
+  ask players with [alive and role = "citizen"] [
+    let intention "sleep"
+    if time = "awake" [
+      set intention "wake up"
+    ]
+    if time = "discuss" [
+      set intention "exchange opinions"
+    ]
+    if time = "vote" [
+      set intention "vote"
+    ]
+    if time = "eliminate" [
+      set intention "eliminate"
+    ]
+    set intentions intention
+  ]
+end
+
+to execute-actions
+  ask players with [alive] [
+    if (intentions = "sleep") or (intentions = "pretend to sleep") or
+       (intentions = "wake up") or (intentions = "pretend to wake up") [
+         set action intentions
+    ]
+    if (intentions = "exchange opinions") [
+      exchange-opinions
+      set action "exchange opinions"
+    ]
+    if (intentions = "vote") [
+      vote ; start the voting procedure
+      set action intentions
+    ]
+    if (intentions = "kill") or (intentions = "eliminate") [
+      eliminate-player ; eliminate a player who received most votes against
+      set action intentions
+    ]
+  ]
+
+  ; execute-actions-mafia
+  ; execute-actions-citizen
+end
+
+; set a vector of opinions
+; -1 indicates that a player has not provided his opinion about who is mafia
+to exchange-opinions
+  set opinions (create-empty-list num-players -1)
+  ask players with [alive = true]
+  [
+    set opinions replace-item who opinions get-opinion
+  ]
+end
+
+; returns an id of a player who the current player suspect to be mafia
+to-report get-opinion
+  ifelse role = "mafia" [
+     report (num_mafia + random num_citizen)
+  ] [
+    report (get-max-index belief_roles_mafia)
+  ]
+end
+
+; a general voting function that stores votes into a global variable
+; the subsequent function has to eliminate a player who got most votes against
+; works both for mafia (night) and all (day) voting
+to vote
+  ; I assume that voting is a list with all zeros at this stage
+  reset-votes
+  if time = "vote" [ ; all players are voting
+    ask players with [alive = true] [
+      let id personal-vote ; the id of the player who player wants to eliminate
+      set votes replace-item id votes ((item id votes) + 1)
+    ]
+  ]
+  if time = "m-vote" [ ; only mafia votes
+    ask players with [alive = true and role = "mafia"][
+      let id personal-vote ; the id of the player who player wants to eliminate
+      set votes replace-item id votes ((item id votes) + 1)
+    ]
+  ]
+end
+
+; a function that outputs the id of a player who a player with [id] wants to eliminate most
+; will involve a player type based heuristic
+; at the current moment it's outputs a random id
+to-report personal-vote
+ let against -1 ; against whom a player wants to vote most
+ let max_prob -1
+ let weights (get-weights personality (role = "mafia")) ; a.k.a significance (lambdas)
+ let i 0
+ while [i < num-players] [
+   if ([alive] of player i = true) and (role != "mafia" or [role] of player i != "mafia") [
+     let mafia ((item i belief_roles_mafia) * (item 0 weights))
+     let danger ((item i belief_danger) * (item 1 weights))
+     let social ((item i belief_social) * (item 2 weights))
+     let prob (mafia + danger + social)
+
+     ; consider all factors and update the current target for elimination
+     if prob > max_prob [
+       set against i
+       set max_prob prob
+     ]
+   ]
+   set i i + 1
+ ]
+ report against
 end
 
 ; the function eliminates the player who received majority of votes against
@@ -162,104 +358,12 @@ to eliminate-player
   if max_vote > 0 [
     ask player max_vote_player [
       set alive false
+      set desire 0
+      set intentions 0
+      set action 0
     ]
   ]
 end
-
-to update-desires
-  update-desires-mafia
-  update-desires-citizen
-end
-
-to update-desires-mafia
-  ask players with [ role = "mafia" ][
-    ifelse is-day?
-    [set desire  "hide" ]
-    [set desire "kill citizens" ]
-  ]
-end
-
-to update-desires-citizen
-  ask players with [ role = "citizen" ][
-    ifelse is-day?
-    [set desire  "find mafias" ]
-    [set desire "sleep" ]
-  ]
-end
-
-to update-beliefs
-  update-beliefs-mafia
-  update-beliefs-citizen
-end
-
-to update-beliefs-mafia
-  ; TODO: Update danger for mafia
-end
-
-to update-beliefs-citizen
-end
-
-to update-intentions
-  update-intentions-mafia
-  update-intentions-citizen
-end
-
-to update-intentions-mafia
-end
-
-to update-intentions-citizen
-end
-
-to execute-actions
-  execute-actions-mafia
-  execute-actions-citizen
-end
-
-
-; a general voting function that stores votes into a global variable
-; the subsequent function has to eliminate a player who got most votes against
-; works both for mafia (night) and all (day) voting
-to start-voting
-  ; I assume that voting is a list with all zeros at this stage
-  ifelse is-day?
-  [ ; all players are voting
-    ask players with [alive = true][
-      let id vote ; the id of the player who player who wants to eliminate
-      set votes replace-item id votes ((item id votes) + 1)
-    ]
-  ]
-  [ ; only mafia votes
-    ask players with [alive = true and role = "mafia"][
-      let id vote ; the id of the player who player who wants to eliminate
-      set votes replace-item id votes ((item id votes) + 1)
-    ]
-   ]
-end
-
-
-; a function that outputs the id of a player who a player with [id] wants to eliminate most
-; will involve a player type based heuristic
-; at the current moment it's outputs a random id
-to-report vote
- let against -1 ; against whom a player wants to vote most
- let max_prob -1
- let weights (get-weights personality (role = "mafia")) ; a.k.a significance (lambdas)
- let i 0
- while [i < num-players and ([alive] of player i = true)]
- [
-   let mafia ((item i belief_roles_mafia) * (item 0 weights))
-   let danger ((item i belief_danger) * (item 1 weights))
-   let social ((item i belief_social) * (item 2 weights))
-
-   ; consider all factors and update the current target for elimination
-   if (mafia + danger + social) > max_prob
-   [set against i]
-   set i i + 1
- ]
- report against
-end
-
-
 
 ; returns a length of 3 weights list associated with a player type
 ; weights meaning:
@@ -286,7 +390,7 @@ to-report get-weights [pers mafia?]
     [set weights [0.2 0.6 0.2]]
   ]
 
-  ; if logician (Tick for Tac)
+  ; if logician (Tit for Tat)
   if pers = item 2 personalities
   [
     ifelse mafia?
@@ -296,26 +400,6 @@ to-report get-weights [pers mafia?]
 
   report weights
 end
-
-; set a vector of opinions
-; -1 indicates that a player has not provided his opinion about who is mafia
-to exchange-opinions
-  set opinions (create-empty-list num-players -1)
-  ask players with [alive = true]
-  [
-    set opinions replace-item who opinions get-opinion
-  ]
-end
-
-; returns an id of a player who the current player suspect to be mafia
-to-report get-opinion
-  let id -1
-  ifelse role = "mafia"
-  [set id (num_mafia + random num_citizen)]
-  [set id (get-max-index belief_roles_mafia)]
-  report id
-end
-
 
 to execute-actions-mafia
   let num_players num-players
@@ -368,7 +452,7 @@ end
 ; updates the positions of players
 ; such that they are standing a circle
 ; TODO : NEED TO make sure that turtles look at the center
-to update-circle
+to render-environment
   let num_players num-players
   ask players with [alive = false] [
     set shape "x"
@@ -376,7 +460,7 @@ to update-circle
   ask players [
     let x 0 ; center of the canvas
     let y 0
-    let angle (who * 2 * pi / num_alive) * 180 / pi
+    let angle (who * 2 * pi / num_players) * 180 / pi
     let x_new (x + radius * cos angle)
     let y_new (y + radius * sin angle)
     setxy x_new y_new
@@ -386,24 +470,27 @@ end
 
 
 ;------------ SUPPORT FUNCTIONS -----------
-; creates an empty list of length n with all values i
-to-report create-empty-list [n i]
-    let l 0
+; creates an empty list of length n with all values val
+to-report create-empty-list [n val]
+    let i 0
     let myList []
-    while  [ l < n ][
-      set myList lput i myList
-      set l l + 1
+    while  [ i < n ][
+      set myList lput val myList
+      set i i + 1
     ]
     report myList
 end
 
-; returns the index of a maximum element from the list A
-to-report get-max-index [A]
+; returns the index of a maximum element from the list l
+to-report get-max-index [l]
   let max_val -99999999
   let max_index -1
   let i 0
-  foreach A [ if max_val < ?
-    [set max_index i]
+  foreach l [
+    if max_val < ? [
+      set max_index i
+      set max_val ?
+    ]
     set i i + 1
   ]
   report i
@@ -511,7 +598,7 @@ num_citizen
 num_citizen
 1
 10
-4
+8
 1
 1
 NIL
@@ -522,8 +609,8 @@ MONITOR
 10
 809
 55
-NIL
-time
+round
+item (ticks mod (length rounds)) rounds
 17
 1
 11
@@ -575,7 +662,7 @@ Believes about danger
 MONITOR
 749
 59
-818
+880
 104
 Intention
 [intentions] of player 0
@@ -652,7 +739,7 @@ Desire
 MONITOR
 750
 106
-816
+880
 151
 Intention
 [intentions] of player 1
@@ -706,9 +793,9 @@ Believes about danger
 
 MONITOR
 667
-155
+153
 748
-200
+198
 Desire
 [desire] of player num_mafia
 17
@@ -718,7 +805,7 @@ Desire
 MONITOR
 750
 154
-815
+880
 199
 Intention
 [intentions] of player num_mafia
@@ -772,9 +859,9 @@ Believes about danger
 
 MONITOR
 668
-204
+202
 748
-249
+247
 Desire
 [desire] of player (num_mafia + 1)
 17
@@ -782,10 +869,10 @@ Desire
 11
 
 MONITOR
-751
-204
-816
-249
+750
+202
+878
+247
 Intention
 [intentions] of player (num_mafia + 1)
 17
@@ -854,6 +941,50 @@ MONITOR
 133
 Opinions
 opinions
+17
+1
+11
+
+MONITOR
+881
+59
+1010
+104
+Action
+[action] of player 0
+17
+1
+11
+
+MONITOR
+880
+106
+1010
+151
+Action
+[action] of player 1
+17
+1
+11
+
+MONITOR
+881
+154
+1010
+199
+Action
+[action] of player num_mafia
+17
+1
+11
+
+MONITOR
+881
+202
+1010
+247
+Action
+[action] of player (num_mafia + 1)
 17
 1
 11
