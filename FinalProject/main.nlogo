@@ -123,11 +123,8 @@ to go
   update-beliefs
   update-desires
   update-intentions
-
   execute-actions
-
   render-environment
-  ;if is-day? [ shoot ]
   tick
 end
 
@@ -150,13 +147,16 @@ end
 to update-beliefs
   ; Perceive from environment, which round it is and set it as a belief
   ask players [ set time get-time ]
-
   ; TODO: opinions should be somehow used here and then reset
   update-beliefs-mafia
   update-beliefs-citizen
-  set opinions (create-empty-list num-players -1)
+  update-social-believes
+  reset-opinions
 end
 
+to reset-opinions
+  set opinions (create-empty-list num-players -1)
+end
 to update-beliefs-mafia
   ; Logically, beliefs should be updated at all times, but the function itself
   ; should actually introduce changes only when there is something to change
@@ -176,6 +176,7 @@ to update-beliefs-mafia
           set belief_danger (replace-item i belief_danger 0)
         ] [
           ; if previously voted against mafia
+          ; UPDATE OF DANGER
           let player_prev_vote (item i prev_votes)
           if player_prev_vote != -1 [
             ifelse (([role] of player player_prev_vote) = "mafia") [
@@ -188,6 +189,37 @@ to update-beliefs-mafia
         set i i + 1
       ]
     ]
+  ]
+end
+
+
+; this function updates believes of all players(both mafia and citizens)
+; the logic is the following: it updates mafia social influence (social believes)
+; based on only mafia opinions, and for citizens all opinions will be considered.
+to update-social-believes
+  if get-time != "vote" [stop] ; this belief has to be updated only after opinions exchange
+  ask players with [alive?][
+    ; for now we simply reset social influece
+    set belief_social create-empty-list num-players 0
+    let i 0 ; starting position
+    let finish num-players ;end position
+    if role = "mafia"[
+      set i 0
+      set finish num_mafia
+    ]
+    while [i < finish][
+    let op item i opinions
+    ; we assume that dead players have -1 opinions (because they are dead :( )
+    ; we ignore the current players oppinions, as well as the ones who have no opinion,
+    ; and if something thinks that the current is mafia
+    if (i != who and op != -1 and op != who) [
+      let num_against item op belief_social
+      set belief_social replace-item op belief_social (num_against + 1)
+      ]
+    set i i + 1
+    ]
+    ; normalization because we want all elemnts to sum to 1
+    set belief_social normalize-list belief_social
   ]
 end
 
@@ -325,7 +357,10 @@ to execute-actions
     ]
   ]
 
-  if eliminate? [ eliminate-player ]
+  if eliminate? [
+    eliminate-player
+    reset-votes
+    ]
 
   ; execute-actions-mafia
   ; execute-actions-citizen
@@ -344,7 +379,7 @@ to-report get-opinion
   ifelse role = "mafia" [
     report (num_mafia + random num_citizen)
   ] [
-    report (get-max-index belief_roles_mafia)
+    report (get-max-index-random belief_roles_mafia)
   ]
 end
 
@@ -352,7 +387,7 @@ end
 ; the subsequent function has to eliminate a player who got most votes against
 ; works both for mafia (night) and all (day) voting
 to vote
-  let id personal-vote ; the id of the player who player wants to eliminate
+  let id get-vote ; the id of the player who player wants to eliminate
   print (list "player" who "wants to kill/eliminate" id)
   set votes replace-item id votes ((item id votes) + 1)
   set prev_vote id
@@ -360,11 +395,12 @@ end
 
 ; a function that outputs the id of a player who a player with [id] wants to eliminate most
 ; will involve a player type based heuristic
-to-report personal-vote
+to-report get-vote
  let against -1 ; against whom a player wants to vote most
  let max_prob -1
  let weights (get-weights personality (role = "mafia")) ; a.k.a significance (lambdas)
  let i 0
+ ; Argmax over all players
  while [i < num-players] [
    if ([alive?] of player i = true) and (role != "mafia" or [role] of player i != "mafia") [
      let mafia ((item i belief_roles_mafia) * (item 0 weights))
@@ -392,29 +428,30 @@ end
 ; the function eliminates the player who received majority of votes against
 ; TODO: if votes are equal then random selection is performed
 to eliminate-player
-  let max_vote_player 0
-  let max_vote item 0 votes
-  let i 1
-  while [i < num-players] [
-    if max_vote < item i votes [
-      set max_vote (item i votes)
-      set max_vote_player i
-    ]
-    set i i + 1
-  ]
+;  let max_vote_player 0
+;  let max_vote item 0 votes
+;  let i 1
+;  while [i < num-players] [
+;    if max_vote < item i votes [
+;      set max_vote (item i votes)
+;      set max_vote_player i
+;    ]
+;    set i i + 1
+;  ]
+;
+;  print max_vote
+;  print max_vote_player
 
-  print max_vote
-  print max_vote_player
-
-  if max_vote > 0 [
-    ask player max_vote_player [
-      set alive? false
-      set desire 0
-      set intentions 0
-      set action 0
-    ]
+  ; returns an id of a player who got most votes against
+  ; if tie - return random of maximums
+  let max_vote_player get-max-index-random votes
+  print (list "placer" max_vote_player "is eliminated")
+  ask player max_vote_player [
+    set alive? false
+    set desire 0
+    set intentions 0
+    set action 0
   ]
-  reset-votes
 end
 
 ; returns a length of 3 weights list associated with a player type
@@ -453,55 +490,55 @@ to-report get-weights [pers mafia?]
   report weights
 end
 
-to execute-actions-mafia
-  let num_players num-players
-  print "execute-action-mafia"
-  ask players with [role = "mafia" and alive? = true] [
-    ifelse is-day? [
-      ; Vote
-      let j 0
-      let voted false
-      while [j < num_players and not voted] [
-        if (j != who) and ([alive?] of player j = true) and ([role] of player j != "mafia") [
-          set votes replace-item j votes ((item j votes) + 1)
-          set voted true
-        ]
-        set j j + 1
-      ]
-    ] [
-      ; Kill citizens
-      let j 0
-      let voted false
-      while [j < num_players and not voted] [
-        if (j != who) and ([alive?] of player j = true) and ([role] of player j != "mafia") [
-          set votes replace-item j votes ((item j votes) + 1)
-          ; print j
-          set voted true
-        ]
-        set j j + 1
-      ]
-    ]
-  ]
-
-end
-
-to execute-actions-citizen
-  let num_players num-players
-  ask players with [role = "citizen" and alive? = true] [
-    if is-day? [
-      ; Vote
-      let j 0
-      let voted false
-      while [j < num_players and not voted] [
-        if (j != who) and ([alive?] of player j = true) [
-          set votes replace-item j votes ((item j votes) + 1)
-          set voted true
-        ]
-        set j j + 1
-      ]
-    ]
-  ]
-end
+;to execute-actions-mafia
+;  let num_players num-players
+;  print "execute-action-mafia"
+;  ask players with [role = "mafia" and alive? = true] [
+;    ifelse is-day? [
+;      ; Vote
+;      let j 0
+;      let voted false
+;      while [j < num_players and not voted] [
+;        if (j != who) and ([alive?] of player j = true) and ([role] of player j != "mafia") [
+;          set votes replace-item j votes ((item j votes) + 1)
+;          set voted true
+;        ]
+;        set j j + 1
+;      ]
+;    ] [
+;      ; Kill citizens
+;      let j 0
+;      let voted false
+;      while [j < num_players and not voted] [
+;        if (j != who) and ([alive?] of player j = true) and ([role] of player j != "mafia") [
+;          set votes replace-item j votes ((item j votes) + 1)
+;          ; print j
+;          set voted true
+;        ]
+;        set j j + 1
+;      ]
+;    ]
+;  ]
+;
+;end
+;
+;to execute-actions-citizen
+;  let num_players num-players
+;  ask players with [role = "citizen" and alive? = true] [
+;    if is-day? [
+;      ; Vote
+;      let j 0
+;      let voted false
+;      while [j < num_players and not voted] [
+;        if (j != who) and ([alive?] of player j = true) [
+;          set votes replace-item j votes ((item j votes) + 1)
+;          set voted true
+;        ]
+;        set j j + 1
+;      ]
+;    ]
+;  ]
+;end
 
 ; updates the positions of players
 ; such that they are standing a circle
@@ -534,6 +571,20 @@ to-report create-empty-list [n val]
     report myList
 end
 
+; returns the max item's index but if there are multiple with the same value
+; the random will be returned
+to-report get-max-index-random [l]
+  let max_indices []
+  let plh -99999999; placeholder
+  let max_value get-max-value l
+  ; we iterate while there are duplicate maximum values in the given list
+  while [get-max-value l = max_value ][
+      let max_id get-max-index l
+      set max_indices lput max_id max_indices
+      set l replace-item max_id l plh ; remove the max value from the list
+  ]
+  report one-of max_indices ; return random
+end
 ; returns the index of a maximum element from the list l
 to-report get-max-index [l]
   let max_val -99999999
@@ -547,6 +598,33 @@ to-report get-max-index [l]
     set i i + 1
   ]
   report max_index
+end
+
+to-report get-max-value [l]
+  let max_id get-max-index l
+  report item max_id l
+end
+
+; returns a normalized vector
+to-report normalize-list [l]
+   let i 0
+   let s 0 ; sum
+   ; finding normalization constant
+   while [i < length(l)] [
+     set s s + item i l
+     set i i + 1
+   ]
+   set i 0
+   ; normalizing
+   let new_l []
+   while [i < length(l)] [
+     let val item i l
+     if s != 0 [ set val val / s]
+     set new_l lput val new_l
+     set i i + 1
+   ]
+   print new_l
+   report new_l
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -585,7 +663,7 @@ num_mafia
 num_mafia
 1
 10
-2
+1
 1
 1
 NIL
@@ -651,7 +729,7 @@ num_citizen
 num_citizen
 1
 10
-10
+3
 1
 1
 NIL
