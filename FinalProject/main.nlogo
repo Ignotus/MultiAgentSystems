@@ -334,7 +334,7 @@ end
 ; set a vector of opinions
 ; -1 indicates that a player has not provided his opinion about who is mafia
 to exchange-opinions
-  ; Collect opinion of current players
+  ; Collect opinion of current player
   set opinions replace-item who opinions get-opinion
   print (list "player" who "thinks" (item who opinions) "is mafia")
 end
@@ -360,7 +360,6 @@ end
 
 ; a function that outputs the id of a player who a player with [id] wants to eliminate most
 ; will involve a player type based heuristic
-; at the current moment it's outputs a random id
 to-report personal-vote
  let against -1 ; against whom a player wants to vote most
  let max_prob -1
@@ -551,10 +550,10 @@ to-report get-max-index [l]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-1087
-10
-1633
-577
+6
+252
+552
+819
 12
 12
 21.44
@@ -659,10 +658,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-744
-10
-856
-55
+227
+769
+339
+814
 round
 ifelse-value (ticks = 0) [\n  \"day\"\n] [\n  item ((ticks - 1) mod (length rounds)) rounds\n]
 17
@@ -681,10 +680,10 @@ Believes about mafias
 11
 
 MONITOR
-714
-59
-795
-104
+964
+64
+1045
+109
 Desire
 [desire] of player 0
 17
@@ -714,10 +713,10 @@ Believes about danger
 11
 
 MONITOR
-796
-59
-927
-104
+1046
+64
+1177
+109
 Intention
 [intentions] of player 0
 17
@@ -760,7 +759,7 @@ id
 MONITOR
 186
 107
-464
+462
 152
 Believes about mafia
 [belief_roles_mafia] of player 1
@@ -780,10 +779,10 @@ Believes about danger
 11
 
 MONITOR
-713
-106
-796
-151
+963
+111
+1046
+156
 Desire
 [desire] of player 1
 17
@@ -791,10 +790,10 @@ Desire
 11
 
 MONITOR
-797
-106
-927
-151
+1047
+111
+1177
+156
 Intention
 [intentions] of player 1
 17
@@ -846,10 +845,10 @@ Believes about danger
 11
 
 MONITOR
-714
-153
-795
-198
+964
+158
+1045
+203
 Desire
 [desire] of player num_mafia
 17
@@ -857,10 +856,10 @@ Desire
 11
 
 MONITOR
-797
-154
-927
-199
+1047
+159
+1177
+204
 Intention
 [intentions] of player num_mafia
 17
@@ -912,10 +911,10 @@ Believes about danger
 11
 
 MONITOR
-715
-202
-795
-247
+965
+207
+1045
+252
 Desire
 [desire] of player (num_mafia + 1)
 17
@@ -923,10 +922,10 @@ Desire
 11
 
 MONITOR
-797
-202
-925
-247
+1047
+207
+1175
+252
 Intention
 [intentions] of player (num_mafia + 1)
 17
@@ -934,10 +933,10 @@ Intention
 11
 
 MONITOR
-1256
-35
-1472
-80
+177
+278
+393
+323
 Votes
 votes
 17
@@ -989,10 +988,10 @@ Personality
 11
 
 MONITOR
-1256
-85
-1473
-130
+177
+328
+394
+373
 Opinions
 opinions
 17
@@ -1000,10 +999,10 @@ opinions
 11
 
 MONITOR
-928
-59
-1057
-104
+1178
+64
+1307
+109
 Action
 [action] of player 0
 17
@@ -1011,10 +1010,10 @@ Action
 11
 
 MONITOR
-927
-106
-1057
-151
+1177
+111
+1307
+156
 Action
 [action] of player 1
 17
@@ -1022,10 +1021,10 @@ Action
 11
 
 MONITOR
-928
-154
-1057
-199
+1178
+159
+1307
+204
 Action
 [action] of player num_mafia
 17
@@ -1033,12 +1032,56 @@ Action
 11
 
 MONITOR
-928
-202
-1057
-247
+1178
+207
+1307
+252
 Action
 [action] of player (num_mafia + 1)
+17
+1
+11
+
+MONITOR
+718
+59
+958
+104
+Social influence
+[belief_social] of player 0
+17
+1
+11
+
+MONITOR
+718
+107
+958
+152
+Social influence
+[belief_social] of player 1
+17
+1
+11
+
+MONITOR
+718
+155
+958
+200
+Social influence
+[belief_social] of player num_mafia
+17
+1
+11
+
+MONITOR
+719
+203
+959
+248
+Social influence
+[belief_social] of player (num_mafia + 1 )
 17
 1
 11
