@@ -377,7 +377,8 @@ end
 ; returns an id of a player who the current player suspect to be mafia
 to-report get-opinion
   ifelse role = "mafia" [
-    report (num_mafia + random num_citizen)
+    ;report (num_mafia + random num_citizen)
+    report (get-max-index-random belief_danger)
   ] [
     report (get-max-index-random belief_roles_mafia)
   ]
@@ -663,7 +664,7 @@ num_mafia
 num_mafia
 1
 10
-1
+2
 1
 1
 NIL
@@ -729,7 +730,7 @@ num_citizen
 num_citizen
 1
 10
-3
+5
 1
 1
 NIL
@@ -1015,7 +1016,7 @@ MONITOR
 278
 393
 323
-Votes
+number of votes against players
 votes
 17
 1
