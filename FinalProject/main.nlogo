@@ -202,9 +202,8 @@ to update-social-believes
     ; for now we simply reset social influece
     set belief_social create-empty-list num-players 0
     let i 0 ; starting position
-    let finish num-players ;end position
+    let finish num-players ; end position
     if role = "mafia"[
-      set i 0
       set finish num_mafia
     ]
     while [i < finish][
@@ -214,7 +213,18 @@ to update-social-believes
     ; and if something thinks that the current is mafia
     if (i != who and op != -1 and op != who) [
       let num_against item op belief_social
-      set belief_social replace-item op belief_social (num_against + 1)
+      ; here comes personality factors
+      let v 1 ; i.e. naive player believes everyone
+      ; logician and vengeful do not trust everyone
+      ; and accept votes proportionally to the danger belief
+      if personality = "logician" or personality = "vengeful"[
+        ; if danger is low the agent is willing to believe more
+         ifelse not (bern-trial ( 1 - item i belief_danger)) [
+           print (list "player" who "did not believe player" i "with danger" item i belief_danger)
+           set v 0
+        ][ print (list "player" who "did believe player" i "with danger" item i belief_danger) ]
+      ]
+      set belief_social replace-item op belief_social (num_against + v )
       ]
     set i i + 1
     ]
@@ -606,6 +616,14 @@ to-report get-max-value [l]
   report item max_id l
 end
 
+
+; performs a Bernauli trial with
+; success probabily p
+to-report bern-trial [p]
+  let r random-float 1.00001
+  ifelse r < p[ report true] [report false]
+end
+
 ; returns a normalized vector
 to-report normalize-list [l]
    let i 0
@@ -624,7 +642,7 @@ to-report normalize-list [l]
      set new_l lput val new_l
      set i i + 1
    ]
-   print new_l
+   ;print new_l
    report new_l
 end
 @#$#@#$#@
@@ -730,7 +748,7 @@ num_citizen
 num_citizen
 1
 10
-5
+7
 1
 1
 NIL
