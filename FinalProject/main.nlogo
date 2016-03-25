@@ -58,6 +58,8 @@ to setup-roles
     set alive? true
     set shape "person"
     set label who
+    set label-color black
+
     set time get-time
     set prev_vote -1
     setxy random-xcor random-ycor
@@ -119,6 +121,11 @@ end
 
 to go
   if finished? [stop]
+  ifelse is-day? [
+    ask players [ set label-color black ]
+  ] [
+    ask players [ set label-color white ]
+  ]
   update-time
   update-beliefs
   update-desires
