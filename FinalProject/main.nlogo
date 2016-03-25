@@ -198,7 +198,7 @@ end
 ; based on only mafia opinions, and for citizens all opinions will be considered.
 to update-social-believes
   if get-time != "vote" [stop] ; this belief has to be updated only after opinions exchange
-  ask players with [alive?][
+  ask players with [alive?] [
     ; for now we simply reset social influece
     set belief_social create-empty-list num-players 0
     let i 0 ; starting position
@@ -206,27 +206,29 @@ to update-social-believes
     if role = "mafia"[
       set finish num_mafia
     ]
-    while [i < finish][
-    let op item i opinions
-    ; we assume that dead players have -1 opinions (because they are dead :( )
-    ; we ignore the current players oppinions, as well as the ones who have no opinion,
-    ; and if something thinks that the current is mafia
-    if (i != who and op != -1 and op != who) [
-      let num_against item op belief_social
-      ; here comes personality factors
-      let v 1 ; i.e. naive player believes everyone
-      ; logician and vengeful do not trust everyone
-      ; and accept votes proportionally to the danger belief
-      if personality = "logician" or personality = "vengeful"[
-        ; if danger is low the agent is willing to believe more
-         ifelse not (bern-trial ( 1 - item i belief_danger)) [
-           print (list "player" who "did not believe player" i "with danger" item i belief_danger)
-           set v 0
-        ][ print (list "player" who "did believe player" i "with danger" item i belief_danger) ]
+    while [i < finish] [
+      let op item i opinions
+      ; we assume that dead players have -1 opinions (because they are dead :( )
+      ; we ignore the current players oppinions, as well as the ones who have no opinion,
+      ; and if something thinks that the current is mafia
+      if (i != who and op != -1 and op != who) [
+        let num_against item op belief_social
+        ; here comes personality factors
+        let v 1 ; i.e. naive player believes everyone
+        ; logician and vengeful do not trust everyone
+        ; and accept votes proportionally to the danger belief
+        if personality = "logician" or personality = "vengeful" [
+          ; if danger is low the agent is willing to believe more
+          ifelse not (bern-trial ( 1 - item i belief_danger)) [
+            print (list "player" who "did not believe player" i "with danger" item i belief_danger)
+            set v 0
+          ][
+            print (list "player" who "did believe player" i "with danger" item i belief_danger)
+          ]
+        ]
+        set belief_social replace-item op belief_social (num_against + v )
       ]
-      set belief_social replace-item op belief_social (num_against + v )
-      ]
-    set i i + 1
+      set i i + 1
     ]
     ; normalization because we want all elemnts to sum to 1
     set belief_social normalize-list belief_social
@@ -456,7 +458,7 @@ to eliminate-player
   ; returns an id of a player who got most votes against
   ; if tie - return random of maximums
   let max_vote_player get-max-index-random votes
-  print (list "placer" max_vote_player "is eliminated")
+  print (list "player" max_vote_player "is eliminated")
   ask player max_vote_player [
     set alive? false
     set desire 0
@@ -588,14 +590,17 @@ to-report get-max-index-random [l]
   let max_indices []
   let plh -99999999; placeholder
   let max_value get-max-value l
-  ; we iterate while there are duplicate maximum values in the given list
-  while [get-max-value l = max_value ][
-      let max_id get-max-index l
-      set max_indices lput max_id max_indices
-      set l replace-item max_id l plh ; remove the max value from the list
+  let i 0
+  ; collect indices with max value
+  while [i < length(l)] [
+    if (item i l) = max_value [
+      set max_indices lput i max_indices
+    ]
+    set i i + 1
   ]
   report one-of max_indices ; return random
 end
+
 ; returns the index of a maximum element from the list l
 to-report get-max-index [l]
   let max_val -99999999
@@ -748,7 +753,7 @@ num_citizen
 num_citizen
 1
 10
-7
+10
 1
 1
 NIL
