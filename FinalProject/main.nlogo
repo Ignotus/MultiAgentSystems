@@ -1,5 +1,5 @@
 ; radius: the radius of the players circle
-globals [rounds votes mafia_color citizen_color radius personalities opinions]
+globals [rounds votes mafia_color citizen_color radius personalities opinions mafia_wins citizen_wins]
 
 breed [players player]
 
@@ -8,7 +8,17 @@ breed [players player]
 players-own [alive? role time belief_roles_mafia belief_roles_citizen belief_danger belief_social desire intentions action personality prev_vote]
 
 to setup
+  reset
+  set mafia_wins 0
+  set citizen_wins 0
+end
+
+to reset
+  let mw mafia_wins
+  let cw citizen_wins
   clear-all
+  set mafia_wins mw
+  set citizen_wins cw
   setup-ticks
   setup-variables
   setup-roles
@@ -118,9 +128,26 @@ to setup-ticks
   reset-ticks
 end
 
+to-report mafia-wins-fraction
+  report ifelse-value (mafia_wins = 0) [ 0 ] [ mafia_wins / (mafia_wins + citizen_wins) ]
+end
+
 
 to go
-  if finished? [stop]
+  if finished? [
+    let alive_mafia_count alive-mafia-count
+    let alive_citizens_count alive-citizen-count
+
+    if alive_mafia_count = 0 [
+      set mafia_wins mafia_wins + 1
+    ]
+
+    if alive_citizens_count = 0 [
+      set citizen_wins citizen_wins + 1
+    ]
+
+    reset
+  ]
   ifelse is-day? [
     ask players [ set label-color black ]
   ] [
@@ -135,10 +162,18 @@ to go
   tick
 end
 
+to-report alive-mafia-count
+  report count players with [role = "mafia" and alive?]
+end
+
+to-report alive-citizen-count
+  report count players with [role = "citizen" and alive?]
+end
+
 to-report finished?
-  let alive_mafia_count count players with [role = "mafia" and alive?]
-  let alive_citizens_count count players with [role = "citizen" and alive?]
-  report (alive_mafia_count = 0) or  (alive_mafia_count = alive_citizens_count)
+  let alive_mafia_count alive-mafia-count
+  let alive_citizens_count alive-citizen-count
+  report (alive_mafia_count = 0) or (alive_citizens_count = 0) ;  or (alive_mafia_count = alive_citizens_count)
 end
 
 ; updates the time of the day and
@@ -760,7 +795,7 @@ num_citizen
 num_citizen
 1
 10
-10
+5
 1
 1
 NIL
@@ -1192,6 +1227,39 @@ MONITOR
 Social influence
 [belief_social] of player (num_mafia + 1 )
 17
+1
+11
+
+MONITOR
+726
+267
+813
+312
+NIL
+mafia_wins
+17
+1
+11
+
+MONITOR
+617
+267
+707
+312
+NIL
+citizen_wins
+17
+1
+11
+
+MONITOR
+833
+266
+972
+311
+NIL
+mafia-wins-fraction
+2
 1
 11
 
