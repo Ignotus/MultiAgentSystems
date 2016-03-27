@@ -59,6 +59,9 @@ to setup-roles
   let num_players num-players
   create-players num_players
 
+  ; CHANGE THIS LIST TO ASSIGN PERSONALITY!
+  let assigned_personality ["naive" "vengeful" "logician" "naive" "vengeful" "logician" "naive" "vengeful" "logician"]
+
   let i 0
   ask players [
     set belief_roles_mafia (create-empty-list num_players 0)
@@ -74,7 +77,11 @@ to setup-roles
     set prev_vote -1
     setxy random-xcor random-ycor
     ; setting personality of a player at this stage randomly
-    set personality one-of personalities
+    ifelse random_personality [
+      set personality one-of personalities
+    ] [
+      set personality (item (who mod (length assigned_personality)) assigned_personality)
+    ]
     ifelse who < num_mafia
     [
       set role "mafia"
@@ -1299,6 +1306,17 @@ mafia-wins-fraction
 2
 1
 11
+
+SWITCH
+708
+10
+906
+43
+random_personality
+random_personality
+1
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
