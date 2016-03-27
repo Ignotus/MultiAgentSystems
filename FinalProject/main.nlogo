@@ -221,10 +221,20 @@ to update-beliefs-mafia
           ; UPDATE OF DANGER
           let player_prev_vote (item i prev_votes)
           if player_prev_vote != -1 [
+            ; if a citizen has voted against *one of* mafia then we increase a danger
+            let p (item i belief_danger)
             ifelse (([role] of player player_prev_vote) = "mafia") [
-              set belief_danger (replace-item i belief_danger (((item i belief_danger) + 1.0) / 2))
+              ifelse (personality = "vengeful") [
+                set belief_danger (replace-item i belief_danger (p + 0.2 * p * (1 - p)))
+              ] [
+                set belief_danger (replace-item i belief_danger (p + 0.1 * p * (1 - p)))
+              ]
             ] [
-              set belief_danger (replace-item i belief_danger (0.75 * (item i belief_danger)))
+              ifelse personality = "vengeful" [
+                set belief_danger (replace-item i belief_danger (0.9 * p))
+              ] [
+                set belief_danger (replace-item i belief_danger (0.8 * p))
+              ]
             ]
           ]
         ]
@@ -299,6 +309,22 @@ to update-beliefs-citizen
           ; if previously voted wrongly
           let player_prev_vote (item i prev_votes)
           if player_prev_vote != -1 [
+            ifelse player_prev_vote = who [
+              let p (item i belief_danger)
+              ifelse (personality = "vengeful") [
+                set belief_danger (replace-item i belief_danger (p + 0.2 * p * (1 - p)))
+              ] [
+                set belief_danger (replace-item i belief_danger (p + 0.1 * p * (1 - p)))
+              ]
+            ] [
+              let p (item i belief_danger)
+              ifelse personality = "vengeful" [
+                set belief_danger (replace-item i belief_danger (0.9 * p))
+              ] [
+                set belief_danger (replace-item i belief_danger (0.8 * p))
+              ]
+            ]
+
             ifelse (item player_prev_vote roles = "citizen") [
               ; increase probability of mafia
               let p (item i belief_roles_mafia)
@@ -806,7 +832,7 @@ num_citizen
 num_citizen
 1
 10
-6
+5
 1
 1
 NIL
