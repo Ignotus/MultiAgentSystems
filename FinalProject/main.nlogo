@@ -139,11 +139,11 @@ to go
     let alive_citizens_count alive-citizen-count
 
     if alive_mafia_count = 0 [
-      set citizen_wins citizen_wins + 1
+      set mafia_wins mafia_wins + 1
     ]
 
     if alive_citizens_count = 0 [
-      set mafia_wins mafia_wins + 1
+      set citizen_wins citizen_wins + 1
     ]
 
     reset
@@ -300,19 +300,19 @@ to update-beliefs-citizen
           let player_prev_vote (item i prev_votes)
           if player_prev_vote != -1 [
             ifelse (item player_prev_vote roles = "citizen") [
-              ; increase danger
-              let p (item i belief_danger)
+              ; increase probability of mafia
+              let p (item i belief_roles_mafia)
               ifelse personality = "vengeful" [
-                set belief_danger (replace-item i belief_danger (p + 0.2 * p * (1 - p)))
+                set belief_roles_mafia (replace-item i belief_roles_mafia (p + 0.2 * p * (1 - p)))
               ] [
-                set belief_danger (replace-item i belief_danger (p + 0.1 * p * (1 - p)))
+                set belief_roles_mafia (replace-item i belief_roles_mafia (p + 0.1 * p * (1 - p)))
               ]
             ] [
-              let p (item i belief_danger)
+              let p (item i belief_roles_mafia)
               ifelse personality = "vengeful" [
-                set belief_danger (replace-item i belief_danger (0.9 * p))
+                set belief_roles_mafia (replace-item i belief_roles_mafia (0.9 * p))
               ] [
-                set belief_danger (replace-item i belief_danger (0.8 * p))
+                set belief_roles_mafia (replace-item i belief_roles_mafia (0.8 * p))
               ]
             ]
           ]
