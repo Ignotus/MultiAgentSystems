@@ -300,9 +300,20 @@ to update-beliefs-citizen
           let player_prev_vote (item i prev_votes)
           if player_prev_vote != -1 [
             ifelse (item player_prev_vote roles = "citizen") [
-              set belief_danger (replace-item i belief_danger (((item i belief_danger) + 1.0) / 2))
+              ; increase danger
+              let p (item i belief_danger)
+              ifelse personality = "vengeful" [
+                set belief_danger (replace-item i belief_danger (p + 0.2 * p * (1 - p)))
+              ] [
+                set belief_danger (replace-item i belief_danger (p + 0.1 * p * (1 - p)))
+              ]
             ] [
-              set belief_danger (replace-item i belief_danger (0.75 * (item i belief_danger)))
+              let p (item i belief_danger)
+              ifelse personality = "vengeful" [
+                set belief_danger (replace-item i belief_danger (0.9 * p))
+              ] [
+                set belief_danger (replace-item i belief_danger (0.8 * p))
+              ]
             ]
           ]
         ]
@@ -795,7 +806,7 @@ num_citizen
 num_citizen
 1
 10
-5
+6
 1
 1
 NIL
