@@ -61,6 +61,7 @@ to setup-roles
 
   ; CHANGE THIS LIST TO ASSIGN PERSONALITY!
   let assigned_personality ["naive" "vengeful" "logician" "naive" "vengeful" "logician" "naive" "vengeful" "logician"]
+  ; let assigned_personality ["logician""logician""naive""naive""naive""naive""naive""naive""naive""naive""naive""naive""naive""naive""naive""naive""naive""naive""naive"]
 
   let i 0
   ask players [
@@ -146,11 +147,11 @@ to go
     let alive_citizens_count alive-citizen-count
 
     if alive_mafia_count = 0 [
-      set mafia_wins mafia_wins + 1
+      set citizen_wins citizen_wins + 1
     ]
 
     if alive_citizens_count = 0 [
-      set citizen_wins citizen_wins + 1
+      set mafia_wins mafia_wins + 1
     ]
 
     reset
@@ -773,7 +774,7 @@ num_mafia
 num_mafia
 1
 10
-2
+1
 1
 1
 NIL
@@ -838,8 +839,8 @@ SLIDER
 num_citizen
 num_citizen
 1
-10
-5
+30
+19
 1
 1
 NIL
@@ -1314,7 +1315,7 @@ SWITCH
 43
 random_personality
 random_personality
-1
+0
 1
 -1000
 
