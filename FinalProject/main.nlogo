@@ -139,11 +139,11 @@ to go
     let alive_citizens_count alive-citizen-count
 
     if alive_mafia_count = 0 [
-      set mafia_wins mafia_wins + 1
+      set citizen_wins citizen_wins + 1
     ]
 
     if alive_citizens_count = 0 [
-      set citizen_wins citizen_wins + 1
+      set mafia_wins mafia_wins + 1
     ]
 
     reset
